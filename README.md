@@ -1,0 +1,222 @@
+```md
+
+# Personal Analytics Dashboard
+
+A cross-platform personal analytics and scheduling application that generates daily schedules, adapts to user feedback, and optimizes workload over time using a hybrid rule-based and machine learning approach.
+
+This project includes:
+- A web-based dashboard
+- A Windows desktop application
+- A shared Python backend for scheduling, analytics, and optimization
+
+---
+
+## 🚀 Features
+
+- Daily task and schedule generation
+- Dynamic schedule updates when tasks or appointments change
+- Task prioritization based on importance and deadlines
+- User feedback collection (stress / underwhelmed / balanced)
+- Adaptive schedule optimization over time
+- Web and desktop clients using the same backend logic
+
+---
+
+## 🧠 System Architecture
+
+The system follows a centralized backend design:
+
+- **Backend (Python / FastAPI)**  
+  Handles scheduling logic, task storage, feedback processing, and machine learning.
+
+- **Web Client (HTML / CSS / JavaScript)**  
+  Provides an interactive browser-based dashboard.
+
+- **Desktop Client (Python GUI)**  
+  Windows application that communicates with the same backend API.
+
+All computation is centralized in the backend to ensure consistency across platforms.
+
+---
+
+## 📁 Project Structure
+
+personal-analytics-dashboard/
+├── backend/ # API, scheduler, ML logic
+├── web/ # Browser-based UI
+├── desktop/ # Windows application
+├── database/ # SQLite database file + schema
+├── docs/ # Design and project documentation
+└── README.md
+
+---
+
+## 🔧 Installation & Setup
+
+Follow these steps to install **all required dependencies** and run the project locally.
+
+---
+
+## 1️⃣ Prerequisites
+
+### Python
+- Python **3.10 or newer** is required.
+- Download from: https://www.python.org/downloads/
+
+⚠️ **IMPORTANT (Windows users)**  
+During installation, make sure to check:
+
+Add Python to PATH:
+
+Verify installation:
+```bash ```
+python --version 
+
+## 2️⃣ Clone the Repository
+
+git clone https://github.com/ITSC-4155-Spring-2026-Team-11/personal-analytics-dashboard.git
+cd personal-analytics-dashboard
+
+## 3️⃣ Backend Setup (API Server)
+
+Navigate to the backend directory:
+cd backend
+
+
+(Optional but recommended) Create a virtual environment:
+python -m venv venv
+
+
+Activate the virtual environment:
+
+Windows:
+venv\Scripts\activate
+
+
+macOS / Linux:
+source venv/bin/activate
+
+
+Install backend dependencies:
+pip install -r requirements.txt
+
+
+Start the backend server:
+uvicorn app:app --reload
+
+
+The API will be available at:
+http://127.0.0.1:8000
+
+
+Interactive API docs:
+http://127.0.0.1:8000/docs
+
+## 4️⃣ Desktop Application Setup (PyQt)
+
+Open a new terminal window (leave backend running).
+
+Navigate to the desktop directory:
+cd desktop
+
+
+(Optional) Activate the same virtual environment if not already active.
+
+Install desktop dependencies:
+pip install -r requirements.txt
+
+
+Run the desktop application:
+python main.py
+
+## 5️⃣ Web Client Setup
+
+No build tools are required.
+Simply open:
+
+web/index.html
+
+in a modern web browser (Chrome, Edge, Firefox).
+
+## 6️⃣ Running the Full System
+
+To run everything together.
+
+1. Start the backend API:
+
+cd backend
+uvicorn app:app --reload
+
+2. Run the desktop app:
+
+cd desktop
+python main.py
+
+3. Open the web client:
+
+web/index.html
+
+## 7️⃣ Common Issues
+
+-- uvicorn not found:
+pip install uvicorn
+
+-- ModuleNotFoundError
+
+Make sure:
+
+1. Virtual environment is activated
+
+2. Dependencies are installed
+
+3. You are running commands from the correct directory
+
+-- CORS errors in browser
+
+Ensure the backend is running and accessible at:
+http://127.0.0.1:8000
+
+
+### 
+1) Backend (API)
+```bash ```
+cd backend
+pip install -r requirements.txt
+uvicorn app:app --reload
+
+API runs at:
+
+http://127.0.0.1:8000
+
+Docs UI:
+
+http://127.0.0.1:8000/docs
+
+2) Web Client
+
+Open:
+web/index.html
+
+3) Desktop Client
+
+# Start backend:
+cd desktop
+uvicorn app:app --reload
+
+# Start desktop:
+cd desktop
+python main.py
+
+---
+
+### Scheduling & ML Plan
+
+This project uses a hybrid approach:
+
+Rule-based scheduler enforces hard constraints and creates a valid schedule.
+
+ML components improve personalization:
+
+Supervised model estimates stress from schedule features.
+
+Q-learning adapts scheduling decisions based on user feedback.
