@@ -62,7 +62,7 @@ Follow these steps to install **all required dependencies** and run the project 
 - Python **3.10 or newer** is required.
 - Download from: https://www.python.org/downloads/
 
-⚠️ **IMPORTANT (Windows users)**  
+ **IMPORTANT (Windows users)**  
 During installation, make sure to check:
 
 Add Python to PATH:
