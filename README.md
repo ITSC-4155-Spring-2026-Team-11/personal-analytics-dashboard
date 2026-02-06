@@ -1,4 +1,3 @@
-```md
 
 # Personal Analytics Dashboard
 
@@ -11,7 +10,7 @@ This project includes:
 
 ---
 
-## 🚀 Features
+## Features
 
 - Daily task and schedule generation
 - Dynamic schedule updates when tasks or appointments change
@@ -22,7 +21,7 @@ This project includes:
 
 ---
 
-## 🧠 System Architecture
+## System Architecture
 
 The system follows a centralized backend design:
 
@@ -39,7 +38,7 @@ All computation is centralized in the backend to ensure consistency across platf
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 personal-analytics-dashboard/
 ├── backend/ # API, scheduler, ML logic
@@ -51,19 +50,19 @@ personal-analytics-dashboard/
 
 ---
 
-## 🔧 Installation & Setup
+## Installation & Setup
 
 Follow these steps to install **all required dependencies** and run the project locally.
 
 ---
 
-## 1️⃣ Prerequisites
+## 1 Prerequisites
 
 ### Python
 - Python **3.10 or newer** is required.
 - Download from: https://www.python.org/downloads/
 
-⚠️ **IMPORTANT (Windows users)**  
+ **IMPORTANT (Windows users)**  
 During installation, make sure to check:
 
 Add Python to PATH:
@@ -72,12 +71,12 @@ Verify installation:
 ```bash ```
 python --version 
 
-## 2️⃣ Clone the Repository
+## 2 Clone the Repository
 
 git clone https://github.com/ITSC-4155-Spring-2026-Team-11/personal-analytics-dashboard.git
 cd personal-analytics-dashboard
 
-## 3️⃣ Backend Setup (API Server)
+## 3 Backend Setup (API Server)
 
 Navigate to the backend directory:
 cd backend
@@ -112,7 +111,7 @@ http://127.0.0.1:8000
 Interactive API docs:
 http://127.0.0.1:8000/docs
 
-## 4️⃣ Desktop Application Setup (PyQt)
+## 4 Desktop Application Setup (PyQt)
 
 Open a new terminal window (leave backend running).
 
@@ -129,7 +128,7 @@ pip install -r requirements.txt
 Run the desktop application:
 python main.py
 
-## 5️⃣ Web Client Setup
+## 5 Web Client Setup
 
 No build tools are required.
 Simply open:
@@ -138,7 +137,7 @@ web/index.html
 
 in a modern web browser (Chrome, Edge, Firefox).
 
-## 6️⃣ Running the Full System
+## 6 Running the Full System
 
 To run everything together.
 
@@ -155,7 +154,7 @@ python main.py
 
 web/index.html
 
-## 7️⃣ Common Issues
+## 7 Common Issues
 
 -- uvicorn not found:
 pip install uvicorn
