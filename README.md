@@ -144,8 +144,7 @@ To run everything together.
 
 1. Start the backend API:
 
-cd backend
-uvicorn app:app --reload
+python -m uvicorn backend.app:app --reload
 
 2. Run the desktop app:
 

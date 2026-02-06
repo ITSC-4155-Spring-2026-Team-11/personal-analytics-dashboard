@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from datetime import datetime
-
-from scheduler.rule_based import build_schedule
+from backend.scheduler.rule_based import build_schedule
 
 router = APIRouter()
 

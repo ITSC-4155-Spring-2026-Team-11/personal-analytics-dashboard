@@ -1,5 +1,5 @@
-from scheduler.constraints import apply_constraints
-from scheduler.priority_engine import sort_by_priority
+from .constraints import apply_constraints
+from .priority_engine import sort_by_priority
 
 def build_schedule(tasks, appointments, day_start="09:00", day_end="17:00"):
     """

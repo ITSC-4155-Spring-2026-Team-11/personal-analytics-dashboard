@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-from routes.tasks import router as tasks_router
-from routes.schedules import router as schedules_router
-from routes.feedback import router as feedback_router
+
+from backend.routes.tasks import router as tasks_router
+from backend.routes.schedules import router as schedules_router
+from backend.routes.feedback import router as feedback_router
 
 app = FastAPI(title="Personal Analytics Dashboard API")
 
@@ -17,9 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
-def root():
-    return {"status": "ok", "message": "Backend is running"}
+def serve_frontend():
+    return FileResponse("static/index.html")
 
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
 app.include_router(schedules_router, prefix="/schedules", tags=["schedules"])
