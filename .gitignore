@@ -18,3 +18,5 @@ database/app.db
 # Editor
 .vscode/
 .idea/
+# Nested project folder
+personal-analytics-dashboard/
