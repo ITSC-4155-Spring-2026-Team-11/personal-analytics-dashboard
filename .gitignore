@@ -22,3 +22,6 @@ database/app.db
 # Environment Variables
 .env
 .env/
+
+# Nested project folder
+personal-analytics-dashboard/
