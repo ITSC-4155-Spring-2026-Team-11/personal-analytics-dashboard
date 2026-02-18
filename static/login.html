@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlannerHub — Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f14;
+      --surface:  #151820;
+      --border:   #232636;
+      --accent:   #6c63ff;
+      --accent2:  #38d9a9;
+      --text:     #e8eaf0;
+      --muted:    #6b7083;
+      --error:    #ff6b6b;
+      --success:  #38d9a9;
+      --warn:     #ffa94d;
+      --radius:   14px;
+      --trans:    0.22s ease;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    /* ── LEFT PANEL ── */
+    .left-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 56px;
+      overflow: hidden;
+    }
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 60% at 20% 30%, rgba(108,99,255,.18) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 80% 80%, rgba(56,217,169,.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+    .brand {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 64px;
+    }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .brand-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.4rem;
+      letter-spacing: -0.5px;
+    }
+    .hero-text {
+      position: relative;
+    }
+    .hero-text h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+    }
+    .hero-text h1 span {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-text p {
+      color: var(--muted);
+      font-size: .98rem;
+      line-height: 1.7;
+      max-width: 360px;
+      margin-bottom: 48px;
+    }
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+    .feature-list li {
+      display: flex; align-items: center; gap: 14px;
+      font-size: .9rem; color: var(--muted);
+    }
+    .feature-list li .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      flex-shrink: 0;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .right-panel {
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 56px;
+      position: relative;
+      border-left: 1px solid var(--border);
+    }
+
+    .auth-box {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 36px;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: .88rem;
+      font-weight: 500;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: var(--trans);
+    }
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 8px rgba(0,0,0,.35);
+    }
+
+    /* Form */
+    .form-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.55rem;
+      margin-bottom: 6px;
+      letter-spacing: -.5px;
+    }
+    .form-sub {
+      color: var(--muted);
+      font-size: .88rem;
+      margin-bottom: 28px;
+    }
+
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 7px;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+    }
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrap .icon {
+      position: absolute;
+      left: 14px;
+      color: var(--muted);
+      font-size: 1rem;
+      pointer-events: none;
+      transition: color var(--trans);
+    }
+    .input-wrap input {
+      width: 100%;
+      padding: 12px 42px 12px 42px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: .92rem;
+      outline: none;
+      transition: border-color var(--trans), box-shadow var(--trans);
+    }
+    .input-wrap input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(108,99,255,.15);
+    }
+    .input-wrap input:focus + .icon-right,
+    .input-wrap input:focus ~ .icon { color: var(--accent); }
+    .input-wrap .icon-right {
+      position: absolute;
+      right: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .95rem;
+      transition: color var(--trans);
+      background: none; border: none;
+    }
+    .field-error { display: none; font-size: .78rem; color: var(--error); margin-top: 5px; }
+    .field.invalid .input-wrap input { border-color: var(--error); }
+    .field.invalid .field-error { display: block; }
+
+    /* Global toast */
+    .toast {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: .85rem;
+      margin-bottom: 20px;
+      border: 1px solid;
+      animation: slideIn .25s ease;
+    }
+    .toast.show { display: flex; }
+    .toast.error   { background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.3); color: var(--error); }
+    .toast.success { background: rgba(56,217,169,.08); border-color: rgba(56,217,169,.3); color: var(--success); }
+    .toast.warn    { background: rgba(255,169,77,.08); border-color: rgba(255,169,77,.3); color: var(--warn); }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+    .toast-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* Forgot password */
+    .row-between {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 22px; margin-top: -4px;
+    }
+    .remember-wrap { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted); cursor: pointer; }
+    .remember-wrap input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; }
+    .link-btn { background: none; border: none; color: var(--accent); font-size: .82rem; cursor: pointer; font-family: inherit; }
+    .link-btn:hover { text-decoration: underline; }
+
+    /* Submit */
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), #8b83ff);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      letter-spacing: .3px;
+      transition: opacity var(--trans), transform var(--trans), box-shadow var(--trans);
+      box-shadow: 0 4px 20px rgba(108,99,255,.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .submit-btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 26px rgba(108,99,255,.45); }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .submit-btn .spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      margin: 0 auto;
+    }
+    .submit-btn.loading .btn-text { display: none; }
+    .submit-btn.loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Lockout bar */
+    .lockout-bar {
+      display: none;
+      background: rgba(255,169,77,.08);
+      border: 1px solid rgba(255,169,77,.25);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: .82rem;
+      color: var(--warn);
+    }
+    .lockout-bar.show { display: block; }
+    .lockout-timer { font-weight: 700; }
+
+    /* Password strength */
+    .strength-bar {
+      display: none;
+      margin-top: 8px;
+    }
+    .strength-bar.show { display: block; }
+    .strength-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .strength-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width .3s ease, background .3s ease;
+      width: 0%;
+    }
+    .strength-label { font-size: .74rem; color: var(--muted); }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--muted); font-size: .78rem;
+      margin: 22px 0;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* Switch link at bottom */
+    .switch-text { text-align: center; font-size: .82rem; color: var(--muted); margin-top: 20px; }
+    .switch-text button { color: var(--accent); background: none; border: none; cursor: pointer; font-size: .82rem; font-family: inherit; }
+    .switch-text button:hover { text-decoration: underline; }
+
+    /* Success screen */
+    .success-screen {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+    }
+    .success-screen.show { display: block; }
+    .success-circle {
+      width: 72px; height: 72px;
+      background: rgba(56,217,169,.12);
+      border: 2px solid var(--accent2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 20px;
+      animation: popIn .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes popIn { from { transform:scale(.5); opacity:0; } to { transform:scale(1); opacity:1; } }
+    .success-screen h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.4rem; margin-bottom: 10px; }
+    .success-screen p { color: var(--muted); font-size: .88rem; margin-bottom: 28px; line-height: 1.6; }
+
+    /* Responsive */
+    @media (max-width: 820px) {
+      body { grid-template-columns: 1fr; }
+      .left-panel { display: none; }
+      .right-panel { padding: 40px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LEFT -->
+<div class="left-panel">
+  <div class="grid-bg"></div>
+  <div class="brand">
+    <div class="brand-icon">📋</div>
+    <span class="brand-name">PlannerHub</span>
+  </div>
+  <div class="hero-text">
+    <h1>Your plans,<br/><span>beautifully organized.</span></h1>
+    <p>Stay on top of every task, deadline, and goal — all from one clean, powerful dashboard.</p>
+    <ul class="feature-list">
+      <li><span class="dot"></span> Smart task boards with drag &amp; drop</li>
+      <li><span class="dot"></span> Calendar sync &amp; deadline reminders</li>
+      <li><span class="dot"></span> Team collaboration &amp; sharing</li>
+      <li><span class="dot"></span> Real-time progress analytics</li>
+    </ul>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="right-panel">
+  <div class="auth-box">
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <!-- ══ LOGIN FORM ══ -->
+    <div id="panel-login">
+      <div class="form-title">Welcome back 👋</div>
+      <div class="form-sub">Sign in to your PlannerHub dashboard</div>
+
+      <!-- Lockout bar (Scenario 6) -->
+      <div class="lockout-bar" id="lockout-bar">
+        🔒 Account temporarily locked. Try again in <span class="lockout-timer" id="lockout-timer">30</span>s
+      </div>
+
+      <!-- Toast -->
+      <div class="toast" id="login-toast">
+        <span class="toast-icon" id="login-toast-icon"></span>
+        <span id="login-toast-msg"></span>
+      </div>
+
+      <form id="login-form" novalidate>
+        <!-- Email -->
+        <div class="field" id="f-login-email">
+          <label for="login-email">Email or Username</label>
+          <div class="input-wrap">
+            <span class="icon">✉</span>
+            <input type="text" id="login-email" placeholder="you@example.com" autocomplete="username" />
+          </div>
+          <span class="field-error" id="err-login-email">This field is required</span>
+        </div>
+
+        <!-- Password -->
+        <div class="field" id="f-login-pass">
+          <label for="login-password">Password</label>
+          <div class="input-wrap">
+            <span class="icon">🔑</span>
+            <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="icon-right" onclick="togglePw('login-password', this)">👁</button>
+          </div>
+          <span class="field-error" id="err-login-pass">This field is required</span>
+        </div>
+
+        <div class="row-between">
+          <label class="remember-wrap">
+            <input type="checkbox" id="remember-me" /> Remember me
+          </label>
+          <button type="button" class="link-btn" onclick="showForgot()">Forgot password?</button>
+        </div>
+
+        <button type="submit" class="submit-btn" id="login-btn">
+          <span class="btn-text">Sign In</span>
+          <div class="spinner"></div>
+        </button>
+      </form>
+
+      <div class="switch-text">Don't have an account? <button onclick="switchTab('signup')">Create one free</button></div>
+    </div>
+
+    <!-- ══ LOGIN SUCCESS ══ -->
+    <div class="success-screen" id="login-success">
+      <div class="success-circle">✓</div>
+      <h2>You're in!</h2>
+      <p>Secure session created. Taking you to your dashboard…</p>
+      <button class="submit-btn" onclick="window.location.href='/static/index.html'">Go to Dashboard →</button>
+    </div>
+
+    <!-- ══ SIGNUP FORM ══ -->
+    <div id="panel-signup" style="display:none;">
+      <div class="form-title">Create account</div>
+      <div class="form-sub">Join PlannerHub — free forever</div>
+
+      <div class="toast" id="signup-toast">
+        <span class="toast-icon" id="signup-toast-icon"></span>
+        <span id="signup-toast-msg"></span>
+      </div>
+
+      <form id="signup-form" novalidate>
+        <!-- Full name -->
+        <div class="field" id="f-su-name">
+          <label for="su-name">Full Name</label>
+          <div class="input-wrap">
+            <span class="icon">👤</span>
+            <input type="text" id="su-name" placeholder="Alex Johnson" autocomplete="name" />
+          </div>
+          <span class="field-error" id="err-su-name">Full name is required</span>
+        </div>
+
+        <!-- Email -->
+        <div class="field" id="f-su-email">
+          <label for="su-email">Email Address</label>
+          <div class="input-wrap">
+            <span class="icon">✉</span>
+            <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <span class="field-error" id="err-su-email">A valid email is required</span>
+        </div>
+
+        <!-- Password -->
+        <div class="field" id="f-su-pass">
+          <label for="su-password">Password</label>
+          <div class="input-wrap">
+            <span class="icon">🔑</span>
+            <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" oninput="checkStrength(this.value)" />
+            <button type="button" class="icon-right" onclick="togglePw('su-password', this)">👁</button>
+          </div>
+          <span class="field-error" id="err-su-pass">Password must be at least 8 characters</span>
+          <div class="strength-bar" id="strength-bar">
+            <div class="strength-track"><div class="strength-fill" id="strength-fill"></div></div>
+            <div class="strength-label" id="strength-label">Weak</div>
+          </div>
+        </div>
+
+        <!-- Confirm password -->
+        <div class="field" id="f-su-confirm">
+          <label for="su-confirm">Confirm Password</label>
+          <div class="input-wrap">
+            <span class="icon">🔒</span>
+            <input type="password" id="su-confirm" placeholder="Repeat your password" autocomplete="new-password" />
+            <button type="button" class="icon-right" onclick="togglePw('su-confirm', this)">👁</button>
+          </div>
+          <span class="field-error" id="err-su-confirm">Passwords do not match</span>
+        </div>
+
+        <button type="submit" class="submit-btn" id="signup-btn">
+          <span class="btn-text">Create Account</span>
+          <div class="spinner"></div>
+        </button>
+      </form>
+
+      <div class="switch-text">Already have an account? <button onclick="switchTab('login')">Sign in</button></div>
+    </div>
+
+    <!-- ══ SIGNUP SUCCESS ══ -->
+    <div class="success-screen" id="signup-success">
+      <div class="success-circle">🎉</div>
+      <h2>Account created!</h2>
+      <p>Welcome to PlannerHub! Taking you to the sign in page…</p>
+      <button class="submit-btn" onclick="resetSignup()">Sign In →</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* ── SIMULATED USER DATABASE ── */
+  const DB = {
+    'demo@planner.com': { password: 'Demo1234!', name: 'Demo User' },
+    'test@planner.com': { password: 'Test5678!', name: 'Test User' }
+  };
+
+  let failCount = 0;
+  let lockUntil = 0;
+  let lockTimer = null;
+
+  /* ── TAB SWITCHING ── */
+  function switchTab(tab) {
+    ['login','signup'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      const p = document.getElementById(`panel-${t}`);
+      if (p) p.style.display = t === tab ? 'block' : 'none';
+      const s = document.getElementById(`${t}-success`);
+      if (s) s.classList.remove('show');
+    });
+    clearToast('login-toast');
+    clearToast('signup-toast');
+  }
+
+  /* ── TOGGLE PASSWORD VISIBILITY ── */
+  function togglePw(id, btn) {
+    const el = document.getElementById(id);
+    el.type = el.type === 'password' ? 'text' : 'password';
+    btn.textContent = el.type === 'password' ? '👁' : '🙈';
+  }
+
+  /* ── TOAST HELPERS ── */
+  function showToast(id, type, icon, msg) {
+    const t = document.getElementById(id);
+    t.className = `toast show ${type}`;
+    document.getElementById(`${id}-icon`).textContent = icon;
+    document.getElementById(`${id}-msg`).textContent = msg;
+  }
+  function clearToast(id) {
+    document.getElementById(id).className = 'toast';
+  }
+
+  /* ── FIELD VALIDATION HELPERS ── */
+  function setValid(fieldId, errId, valid, msg = '') {
+    const f = document.getElementById(fieldId);
+    const e = document.getElementById(errId);
+    if (valid) { f.classList.remove('invalid'); }
+    else { f.classList.add('invalid'); if (msg) e.textContent = msg; }
+    return valid;
+  }
+
+  /* ── PASSWORD STRENGTH (Signup) ── */
+  function checkStrength(val) {
+    const bar = document.getElementById('strength-bar');
+    const fill = document.getElementById('strength-fill');
+    const label = document.getElementById('strength-label');
+    if (!val) { bar.classList.remove('show'); return; }
+    bar.classList.add('show');
+    let score = 0;
+    if (val.length >= 8)  score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const map = [
+      { w: '20%', bg: '#ff6b6b', lbl: 'Very weak' },
+      { w: '40%', bg: '#ffa94d', lbl: 'Weak' },
+      { w: '65%', bg: '#ffd43b', lbl: 'Fair' },
+      { w: '85%', bg: '#69db7c', lbl: 'Good' },
+      { w: '100%', bg: '#38d9a9', lbl: 'Strong 💪' }
+    ];
+    const s = map[Math.max(0, score - 1)];
+    fill.style.width = s.w;
+    fill.style.background = s.bg;
+    label.textContent = s.lbl;
+  }
+
+  /* ── LOCKOUT TIMER ── */
+  function startLockout(seconds) {
+    const bar = document.getElementById('lockout-bar');
+    const timerEl = document.getElementById('lockout-timer');
+    bar.classList.add('show');
+    lockUntil = Date.now() + seconds * 1000;
+    document.getElementById('login-btn').disabled = true;
+    clearInterval(lockTimer);
+    lockTimer = setInterval(() => {
+      const left = Math.ceil((lockUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        clearInterval(lockTimer);
+        bar.classList.remove('show');
+        document.getElementById('login-btn').disabled = false;
+        failCount = 0;
+      } else {
+        timerEl.textContent = left;
+      }
+    }, 1000);
+  }
+
+  function isLocked() { return Date.now() < lockUntil; }
+
+  /* ── SIMULATE ASYNC AUTH ── */
+  function fakeDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /* ── LOGIN SUBMIT (Scenarios 1–6) ── */
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isLocked()) return;
+
+    clearToast('login-toast');
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+
+    // Scenario 4: Missing fields
+    let ok = true;
+    if (!email) ok = setValid('f-login-email','err-login-email', false, 'Email or username is required');
+    else setValid('f-login-email','err-login-email', true);
+    if (!pass)  ok = setValid('f-login-pass','err-login-pass', false, 'Password is required') && ok;
+    else setValid('f-login-pass','err-login-pass', true);
+
+    if (!ok) {
+      showToast('login-toast','error','⚠️','Please fill in all required fields.');
+      return;
+    }
+
+    // Loading state
+    const btn = document.getElementById('login-btn');
+    btn.classList.add('loading'); btn.disabled = true;
+    await fakeDelay(900);
+    btn.classList.remove('loading'); btn.disabled = false;
+
+    // Scenario 3: Account doesn't exist
+    if (!DB[email]) {
+      failCount++;
+      setValid('f-login-email','err-login-email', false, 'No account found with this email');
+      showToast('login-toast','error','❌','Account does not exist. Please check your email or sign up.');
+      if (failCount >= 5) startLockout(30);
+      return;
+    }
+
+    // Scenario 2: Wrong password
+    if (DB[email].password !== pass) {
+      failCount++;
+      setValid('f-login-pass','err-login-pass', false, 'Incorrect password');
+      const remaining = 5 - failCount;
+      const msg = remaining > 0
+        ? `Incorrect password. ${remaining} attempt${remaining!==1?'s':''} remaining before lockout.`
+        : 'Too many failed attempts.';
+      showToast('login-toast','error','🔐', msg);
+      // Scenario 6: lockout
+      if (failCount >= 5) startLockout(30);
+      return;
+    }
+
+    // Scenario 1 + 5: Success → secure session then redirect to dashboard
+    failCount = 0;
+    sessionStorage.setItem('planner_session', JSON.stringify({
+      user: DB[email].name, email, loginTime: new Date().toISOString()
+    }));
+
+    // Show brief success screen then redirect
+    document.getElementById('panel-login').style.display = 'none';
+    document.getElementById('login-success').classList.add('show');
+    setTimeout(() => { window.location.href = '/static/index.html'; }, 1800);
+  });
+
+  function resetLogin() {
+    document.getElementById('login-form').reset();
+    document.getElementById('panel-login').style.display = 'block';
+    document.getElementById('login-success').classList.remove('show');
+    clearToast('login-toast');
+    sessionStorage.removeItem('planner_session');
+  }
+
+  /* ── FORGOT PASSWORD ── */
+  function showForgot() {
+    const email = document.getElementById('login-email').value.trim();
+    if (email && DB[email]) {
+      showToast('login-toast','success','📧',`Password reset link sent to ${email}`);
+    } else if (email) {
+      showToast('login-toast','error','❌','No account found with that email address.');
+    } else {
+      showToast('login-toast','warn','💡','Enter your email above, then click "Forgot password?"');
+    }
+  }
+
+  /* ── SIGNUP SUBMIT ── */
+  document.getElementById('signup-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearToast('signup-toast');
+
+    const name    = document.getElementById('su-name').value.trim();
+    const email   = document.getElementById('su-email').value.trim();
+    const pass    = document.getElementById('su-password').value;
+    const confirm = document.getElementById('su-confirm').value;
+
+    let ok = true;
+    // Name
+    if (!name) ok = setValid('f-su-name','err-su-name', false, 'Full name is required') && false;
+    else setValid('f-su-name','err-su-name', true);
+    // Email
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRe.test(email)) ok = setValid('f-su-email','err-su-email', false, 'Enter a valid email address') && false;
+    else setValid('f-su-email','err-su-email', true);
+    // Password
+    if (pass.length < 8) ok = setValid('f-su-pass','err-su-pass', false, 'Password must be at least 8 characters') && false;
+    else setValid('f-su-pass','err-su-pass', true);
+    // Confirm
+    if (pass !== confirm) ok = setValid('f-su-confirm','err-su-confirm', false, 'Passwords do not match') && false;
+    else setValid('f-su-confirm','err-su-confirm', true);
+
+    if (!ok) {
+      showToast('signup-toast','error','⚠️','Please correct the errors above.');
+      return;
+    }
+
+    // Email already exists
+    if (DB[email]) {
+      setValid('f-su-email','err-su-email', false, 'An account with this email already exists');
+      showToast('signup-toast','error','❌','This email is already registered. Try signing in.');
+      return;
+    }
+
+    const btn = document.getElementById('signup-btn');
+    btn.classList.add('loading'); btn.disabled = true;
+    await fakeDelay(1000);
+    btn.classList.remove('loading'); btn.disabled = false;
+
+    // Register new user
+    DB[email] = { password: pass, name };
+    document.getElementById('panel-signup').style.display = 'none';
+    document.getElementById('signup-success').classList.add('show');
+    setTimeout(() => { resetSignup(); }, 2200);
+  });
+
+  function resetSignup() {
+    document.getElementById('signup-form').reset();
+    document.getElementById('panel-signup').style.display = 'block';
+    document.getElementById('signup-success').classList.remove('show');
+    clearToast('signup-toast');
+    checkStrength('');
+    switchTab('login');
+  }
+</script>
+</body>
+</html>

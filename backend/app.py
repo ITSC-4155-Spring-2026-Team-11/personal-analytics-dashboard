@@ -23,7 +23,13 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
-def serve_frontend():
+def serve_login():
+    """Serve the login / account creation page."""
+    return FileResponse("static/login.html")
+
+@app.get("/dashboard")
+def serve_dashboard():
+    """Serve the main dashboard (requires valid session on the client side)."""
     return FileResponse("static/index.html")
 
 app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])

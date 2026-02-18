@@ -2,13 +2,87 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Personal Analytics Dashboard</title>
+  <title>PlannerHub — Dashboard</title>
+  <style>
+    body { font-family: sans-serif; background: #0d0f14; color: #e8eaf0; margin: 0; padding: 0; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px;
+      background: #151820;
+      border-bottom: 1px solid #232636;
+    }
+    .brand { font-size: 1.2rem; font-weight: 700; }
+    .user-info { display: flex; align-items: center; gap: 16px; font-size: .9rem; color: #6b7083; }
+    .signout-btn {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid #232636;
+      border-radius: 8px;
+      color: #e8eaf0;
+      cursor: pointer;
+      font-size: .85rem;
+      transition: background .2s;
+    }
+    .signout-btn:hover { background: #232636; }
+    main { padding: 40px 32px; }
+    h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    p { color: #6b7083; }
+    #output { margin-top: 20px; background: #151820; border: 1px solid #232636; border-radius: 10px; padding: 20px; }
+  </style>
 </head>
 <body>
-  <h1>Today's Schedule</h1>
-  <pre id="output">Loading...</pre>
 
-  <script src="js/api.js"></script>
-  <script src="js/schedule.js"></script>
+<header>
+  <div class="brand">📋 PlannerHub</div>
+  <div class="user-info">
+    <span id="welcome-msg">Loading...</span>
+    <button class="signout-btn" onclick="signOut()">Sign Out</button>
+  </div>
+</header>
+
+<main>
+  <h1>Today's Schedule</h1>
+  <p>Here's what's on your plate for today.</p>
+  <pre id="output">Loading tasks...</pre>
+</main>
+
+<script>
+  // ── SESSION GUARD ──
+  // If no session exists, kick user back to login
+  const raw = sessionStorage.getItem('planner_session');
+  if (!raw) {
+    window.location.href = '/';
+  } else {
+    const session = JSON.parse(raw);
+    document.getElementById('welcome-msg').textContent = `👋 Welcome, ${session.user}`;
+  }
+
+  // ── SIGN OUT ──
+  function signOut() {
+    sessionStorage.removeItem('planner_session');
+    window.location.href = '/';
+  }
+
+  // ── LOAD TASKS FROM API ──
+  async function loadTasks() {
+    try {
+      const res = await fetch('/tasks/');
+      const data = await res.json();
+      const output = document.getElementById('output');
+      if (data.tasks && data.tasks.length > 0) {
+        output.textContent = JSON.stringify(data.tasks, null, 2);
+      } else {
+        output.textContent = 'No tasks yet. Add some tasks to get started!';
+      }
+    } catch (err) {
+      document.getElementById('output').textContent = 'Could not load tasks. Is the backend running?';
+    }
+  }
+
+  loadTasks();
+</script>
+
+<script src="js/api.js" onerror="console.warn('api.js not found')"></script>
+<script src="js/schedule.js" onerror="console.warn('schedule.js not found')"></script>
 </body>
 </html>
