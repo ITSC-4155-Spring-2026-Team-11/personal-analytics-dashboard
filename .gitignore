@@ -18,3 +18,7 @@ database/app.db
 # Editor
 .vscode/
 .idea/
+
+# Environment Variables
+.env
+.env/
