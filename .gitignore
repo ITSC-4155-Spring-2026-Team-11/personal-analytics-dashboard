@@ -18,3 +18,7 @@ database/app.db
 # Editor
 .vscode/
 .idea/
+
+# Web
+node_modules/
+dist/

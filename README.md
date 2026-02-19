@@ -152,7 +152,9 @@ python main.py
 
 3. Open the web client:
 
-web/index.html
+Navigate to the react directory and run npm install (only needed one time, the first time you run the program)
+
+run: npm run dev
 
 ## 7 Common Issues
 
