@@ -23,12 +23,12 @@
 
 ## Immediate
 
-Add CORS so browser fetch works cleanly
+Change allow_origins to your actual domain(s) before deploying
+    Example production value:
+        allow_origins=["https://yourapp.com", "https://www.yourapp.com"]
 
-Implement DB storage for tasks
-
-Replace mock schedule route with rule_based scheduler call
-
-Log feedback into DB
-
-Add ML later after you have real usage data
+Generate a strong key once:
+   python -c "import secrets; print(secrets.token_hex(32))"
+Then set it as an environment variable on your machine/server:
+Windows:  setx SECRET_KEY "your-generated-key"
+Mac/Linux: export SECRET_KEY="your-generated-key"

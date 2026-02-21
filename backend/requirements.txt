@@ -1,5 +1,8 @@
 fastapi
 uvicorn
-pydantic
+pydantic[email]
 sqlalchemy
 requests
+bcrypt
+python-jose[cryptography]
+python-multipart

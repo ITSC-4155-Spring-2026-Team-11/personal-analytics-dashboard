@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 type Tab = "login" | "signup";
-
-type DBUser = { password: string; name: string };
-type DB = Record<string, DBUser>;
 
 type ToastType = "success" | "error" | "warn";
 
@@ -24,23 +21,15 @@ type StrengthState = {
   label: string;
 };
 
+const API = "http://localhost:8000";
+
 function isValidEmail(email: string) {
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRe.test(email);
 }
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 export default function Login() {
   const nav = useNavigate();
-
-  // Simulated DB (mutable like the original HTML)
-  const dbRef = useRef<DB>({
-    "demo@planner.com": { password: "Demo1234!", name: "Demo User" },
-    "test@planner.com": { password: "Test5678!", name: "Test User" },
-  });
 
   const [tab, setTab] = useState<Tab>("login");
 
@@ -100,8 +89,8 @@ export default function Login() {
 
   useEffect(() => {
     // If already signed in, go to dashboard
-    const raw = sessionStorage.getItem("planner_session");
-    if (raw) nav("/dashboard", { replace: true });
+    const token = sessionStorage.getItem("access_token");
+    if (token) nav("/dashboard", { replace: true });
   }, [nav]);
 
   useEffect(() => {
@@ -133,7 +122,6 @@ export default function Login() {
     setLoginSuccess(false);
     setSignupSuccess(false);
 
-    // Optional: clear invalid styling when switching
     setLoginFields((p) => ({
       ...p,
       email: { ...p.email, invalid: false },
@@ -192,14 +180,14 @@ export default function Login() {
     const email = loginEmail.trim();
     const pass = loginPass;
 
-    // Scenario 4: missing fields
+    // Client-side validation
     let ok = true;
 
     if (!email) {
       ok = false;
       setLoginFields((p) => ({
         ...p,
-        email: { invalid: true, msg: "Email or username is required" },
+        email: { invalid: true, msg: "Email is required" },
       }));
     } else {
       setLoginFields((p) => ({ ...p, email: { ...p.email, invalid: false } }));
@@ -220,85 +208,79 @@ export default function Login() {
       return;
     }
 
-    // Loading state
     setLoginLoading(true);
-    await sleep(900);
-    setLoginLoading(false);
 
-    const db = dbRef.current;
+    try {
+      // OAuth2PasswordRequestForm expects form data, not JSON
+      const formData = new URLSearchParams();
+      formData.append("username", email);
+      formData.append("password", pass);
 
-    // Scenario 3: account doesn't exist
-    if (!db[email]) {
-      const nextFails = failCount + 1;
-      setFailCount(nextFails);
+      const res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString(),
+      });
 
-      setLoginFields((p) => ({
-        ...p,
-        email: { invalid: true, msg: "No account found with this email" },
-      }));
-      showToast(
-        "login",
-        "error",
-        "❌",
-        "Account does not exist. Please check your email or sign up."
-      );
+      const data = await res.json();
 
-      if (nextFails >= 5) startLockout(30);
-      return;
+      if (!res.ok) {
+        // 401 = wrong credentials, 403 = not verified
+        const nextFails = failCount + 1;
+        setFailCount(nextFails);
+
+        if (res.status === 403) {
+          showToast("login", "warn", "📧", "Please verify your email before logging in.");
+        } else {
+          const remaining = 5 - nextFails;
+          const msg =
+            remaining > 0
+              ? `Incorrect email or password. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`
+              : "Too many failed attempts.";
+          showToast("login", "error", "🔐", msg);
+          setLoginFields((p) => ({
+            ...p,
+            pass: { invalid: true, msg: "Incorrect email or password" },
+          }));
+        }
+
+        if (nextFails >= 5) startLockout(30);
+        return;
+      }
+
+      // Success — store tokens
+      setFailCount(0);
+      sessionStorage.setItem("access_token", data.access_token);
+      sessionStorage.setItem("refresh_token", data.refresh_token);
+
+      // Store user info for dashboard display
+      const session = { email, loginTime: new Date().toISOString() };
+      sessionStorage.setItem("planner_session", JSON.stringify(session));
+
+      if (rememberMe) {
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token);
+        localStorage.setItem("planner_session", JSON.stringify(session));
+      } else {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("planner_session");
+      }
+
+      setLoginSuccess(true);
+      setTimeout(() => nav("/dashboard", { replace: true }), 1800);
+
+    } catch {
+      showToast("login", "error", "❌", "Could not connect to server. Is the backend running?");
+    } finally {
+      setLoginLoading(false);
     }
-
-    // Scenario 2: wrong password
-    if (db[email].password !== pass) {
-      const nextFails = failCount + 1;
-      setFailCount(nextFails);
-
-      setLoginFields((p) => ({
-        ...p,
-        pass: { invalid: true, msg: "Incorrect password" },
-      }));
-
-      const remaining = 5 - nextFails;
-      const msg =
-        remaining > 0
-          ? `Incorrect password. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining before lockout.`
-          : "Too many failed attempts.";
-
-      showToast("login", "error", "🔐", msg);
-
-      if (nextFails >= 5) startLockout(30);
-      return;
-    }
-
-    // Scenario 1 + 5: success
-    setFailCount(0);
-
-    const session = {
-      user: db[email].name,
-      email,
-      loginTime: new Date().toISOString(),
-    };
-
-    // Keep original behavior (sessionStorage), but if rememberMe checked, mirror to localStorage too
-    sessionStorage.setItem("planner_session", JSON.stringify(session));
-    if (rememberMe) localStorage.setItem("planner_session", JSON.stringify(session));
-    else localStorage.removeItem("planner_session");
-
-    setLoginSuccess(true);
-
-    // brief success then redirect
-    setTimeout(() => {
-      nav("/dashboard", { replace: true });
-    }, 1800);
   }
 
   function onForgotPassword() {
     const email = loginEmail.trim();
-    const db = dbRef.current;
-
-    if (email && db[email]) {
-      showToast("login", "success", "📧", `Password reset link sent to ${email}`);
-    } else if (email) {
-      showToast("login", "error", "❌", "No account found with that email address.");
+    if (email) {
+      showToast("login", "success", "📧", `If ${email} is registered, a reset link will be sent.`);
     } else {
       showToast("login", "warn", "💡", 'Enter your email above, then click "Forgot password?"');
     }
@@ -341,6 +323,18 @@ export default function Login() {
         ...p,
         pass: { invalid: true, msg: "Password must be at least 8 characters" },
       }));
+    } else if (!pass.match(/[A-Z]/)) {
+      ok = false;
+      setSignupFields((p) => ({
+        ...p,
+        pass: { invalid: true, msg: "Password must contain at least one uppercase letter" },
+      }));
+    } else if (!pass.match(/[0-9]/)) {
+      ok = false;
+      setSignupFields((p) => ({
+        ...p,
+        pass: { invalid: true, msg: "Password must contain at least one number" },
+      }));
     } else {
       setSignupFields((p) => ({ ...p, pass: { ...p.pass, invalid: false } }));
     }
@@ -360,30 +354,32 @@ export default function Login() {
       return;
     }
 
-    const db = dbRef.current;
-
-    // Email already exists
-    if (db[email]) {
-      setSignupFields((p) => ({
-        ...p,
-        email: { invalid: true, msg: "An account with this email already exists" },
-      }));
-      showToast("signup", "error", "❌", "This email is already registered. Try signing in.");
-      return;
-    }
-
     setSignupLoading(true);
-    await sleep(1000);
-    setSignupLoading(false);
 
-    // Register user
-    db[email] = { password: pass, name };
-    setSignupSuccess(true);
+    try {
+      const res = await fetch(`${API}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password: pass }),
+      });
 
-    // After a moment, take them back to sign in like the original
-    setTimeout(() => {
-      resetSignup();
-    }, 2200);
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Surface any validation errors from the backend
+        const detail = data.detail ?? "Registration failed. Please try again.";
+        showToast("signup", "error", "❌", detail);
+        return;
+      }
+
+      setSignupSuccess(true);
+      setTimeout(() => resetSignup(), 2200);
+
+    } catch {
+      showToast("signup", "error", "❌", "Could not connect to server. Is the backend running?");
+    } finally {
+      setSignupLoading(false);
+    }
   }
 
   function resetSignup() {
@@ -442,7 +438,6 @@ export default function Login() {
           <div className="tab-bar">
             <button
               className={`tab-btn ${tab === "login" ? "active" : ""}`}
-              id="tab-login"
               type="button"
               onClick={() => switchTab("login")}
             >
@@ -450,7 +445,6 @@ export default function Login() {
             </button>
             <button
               className={`tab-btn ${tab === "signup" ? "active" : ""}`}
-              id="tab-signup"
               type="button"
               onClick={() => switchTab("signup")}
             >
@@ -464,30 +458,19 @@ export default function Login() {
               <div className="form-title">Welcome back 👋</div>
               <div className="form-sub">Sign in to your PlannerHub dashboard</div>
 
-              {/* Lockout bar */}
-              <div className={`lockout-bar ${isLocked ? "show" : ""}`} id="lockout-bar">
+              <div className={`lockout-bar ${isLocked ? "show" : ""}`}>
                 Too many failed attempts. Try again in{" "}
-                <span className="lockout-timer" id="lockout-timer">
-                  {lockLeft}
-                </span>
-                s
+                <span className="lockout-timer">{lockLeft}</span>s
               </div>
 
-              {/* Toast */}
-              <div
-                className={`toast ${loginToast.show ? "show" : ""} ${loginToast.type ?? ""}`}
-                id="login-toast"
-              >
-                <span className="toast-icon" id="login-toast-icon">
-                  {loginToast.icon ?? ""}
-                </span>
-                <span id="login-toast-msg">{loginToast.msg ?? ""}</span>
+              <div className={`toast ${loginToast.show ? "show" : ""} ${loginToast.type ?? ""}`}>
+                <span className="toast-icon">{loginToast.icon ?? ""}</span>
+                <span>{loginToast.msg ?? ""}</span>
               </div>
 
-              <form id="login-form" noValidate onSubmit={onLoginSubmit}>
-                {/* Email */}
-                <div className={`field ${loginFields.email.invalid ? "invalid" : ""}`} id="f-login-email">
-                  <label htmlFor="login-email">Email or Username</label>
+              <form noValidate onSubmit={onLoginSubmit}>
+                <div className={`field ${loginFields.email.invalid ? "invalid" : ""}`}>
+                  <label htmlFor="login-email">Email</label>
                   <div className="input-wrap">
                     <span className="icon">✉</span>
                     <input
@@ -500,13 +483,10 @@ export default function Login() {
                       disabled={loginLoading || isLocked}
                     />
                   </div>
-                  <span className="field-error" id="err-login-email">
-                    {loginFields.email.msg}
-                  </span>
+                  <span className="field-error">{loginFields.email.msg}</span>
                 </div>
 
-                {/* Password */}
-                <div className={`field ${loginFields.pass.invalid ? "invalid" : ""}`} id="f-login-pass">
+                <div className={`field ${loginFields.pass.invalid ? "invalid" : ""}`}>
                   <label htmlFor="login-password">Password</label>
                   <div className="input-wrap">
                     <span className="icon">🔑</span>
@@ -528,9 +508,7 @@ export default function Login() {
                       {showLoginPw ? "🙈" : "👁"}
                     </button>
                   </div>
-                  <span className="field-error" id="err-login-pass">
-                    {loginFields.pass.msg}
-                  </span>
+                  <span className="field-error">{loginFields.pass.msg}</span>
                 </div>
 
                 <div className="row-between">
@@ -556,7 +534,6 @@ export default function Login() {
 
                 <button
                   className={`submit-btn ${loginLoading ? "loading" : ""}`}
-                  id="login-btn"
                   type="submit"
                   disabled={loginLoading || isLocked}
                 >
@@ -576,7 +553,7 @@ export default function Login() {
 
           {/* LOGIN SUCCESS */}
           {tab === "login" && loginSuccess && (
-            <div className="success-screen show" id="login-success">
+            <div className="success-screen show">
               <div className="success-circle">✓</div>
               <h2>You're in!</h2>
               <p>Secure session created. Taking you to your dashboard…</p>
@@ -592,20 +569,13 @@ export default function Login() {
               <div className="form-title">Create account</div>
               <div className="form-sub">Join PlannerHub — free forever</div>
 
-              {/* Toast */}
-              <div
-                className={`toast ${signupToast.show ? "show" : ""} ${signupToast.type ?? ""}`}
-                id="signup-toast"
-              >
-                <span className="toast-icon" id="signup-toast-icon">
-                  {signupToast.icon ?? ""}
-                </span>
-                <span id="signup-toast-msg">{signupToast.msg ?? ""}</span>
+              <div className={`toast ${signupToast.show ? "show" : ""} ${signupToast.type ?? ""}`}>
+                <span className="toast-icon">{signupToast.icon ?? ""}</span>
+                <span>{signupToast.msg ?? ""}</span>
               </div>
 
-              <form id="signup-form" noValidate onSubmit={onSignupSubmit}>
-                {/* Full name */}
-                <div className={`field ${signupFields.name.invalid ? "invalid" : ""}`} id="f-su-name">
+              <form noValidate onSubmit={onSignupSubmit}>
+                <div className={`field ${signupFields.name.invalid ? "invalid" : ""}`}>
                   <label htmlFor="su-name">Full Name</label>
                   <div className="input-wrap">
                     <span className="icon">👤</span>
@@ -619,13 +589,10 @@ export default function Login() {
                       disabled={signupLoading}
                     />
                   </div>
-                  <span className="field-error" id="err-su-name">
-                    {signupFields.name.msg}
-                  </span>
+                  <span className="field-error">{signupFields.name.msg}</span>
                 </div>
 
-                {/* Email */}
-                <div className={`field ${signupFields.email.invalid ? "invalid" : ""}`} id="f-su-email">
+                <div className={`field ${signupFields.email.invalid ? "invalid" : ""}`}>
                   <label htmlFor="su-email">Email Address</label>
                   <div className="input-wrap">
                     <span className="icon">✉</span>
@@ -639,13 +606,10 @@ export default function Login() {
                       disabled={signupLoading}
                     />
                   </div>
-                  <span className="field-error" id="err-su-email">
-                    {signupFields.email.msg}
-                  </span>
+                  <span className="field-error">{signupFields.email.msg}</span>
                 </div>
 
-                {/* Password */}
-                <div className={`field ${signupFields.pass.invalid ? "invalid" : ""}`} id="f-su-pass">
+                <div className={`field ${signupFields.pass.invalid ? "invalid" : ""}`}>
                   <label htmlFor="su-password">Password</label>
                   <div className="input-wrap">
                     <span className="icon">🔑</span>
@@ -670,26 +634,20 @@ export default function Login() {
                       {showSuPw ? "🙈" : "👁"}
                     </button>
                   </div>
-                  <span className="field-error" id="err-su-pass">
-                    {signupFields.pass.msg}
-                  </span>
+                  <span className="field-error">{signupFields.pass.msg}</span>
 
-                  <div className={`strength-bar ${strength.show ? "show" : ""}`} id="strength-bar">
+                  <div className={`strength-bar ${strength.show ? "show" : ""}`}>
                     <div className="strength-track">
                       <div
                         className="strength-fill"
-                        id="strength-fill"
                         style={{ width: strength.width, background: strength.bg }}
                       ></div>
                     </div>
-                    <div className="strength-label" id="strength-label">
-                      {strength.label}
-                    </div>
+                    <div className="strength-label">{strength.label}</div>
                   </div>
                 </div>
 
-                {/* Confirm password */}
-                <div className={`field ${signupFields.confirm.invalid ? "invalid" : ""}`} id="f-su-confirm">
+                <div className={`field ${signupFields.confirm.invalid ? "invalid" : ""}`}>
                   <label htmlFor="su-confirm">Confirm Password</label>
                   <div className="input-wrap">
                     <span className="icon">🔒</span>
@@ -711,14 +669,11 @@ export default function Login() {
                       {showSuConfirmPw ? "🙈" : "👁"}
                     </button>
                   </div>
-                  <span className="field-error" id="err-su-confirm">
-                    {signupFields.confirm.msg}
-                  </span>
+                  <span className="field-error">{signupFields.confirm.msg}</span>
                 </div>
 
                 <button
                   className={`submit-btn ${signupLoading ? "loading" : ""}`}
-                  id="signup-btn"
                   type="submit"
                   disabled={signupLoading}
                 >
@@ -738,10 +693,10 @@ export default function Login() {
 
           {/* SIGNUP SUCCESS */}
           {tab === "signup" && signupSuccess && (
-            <div className="success-screen show" id="signup-success">
+            <div className="success-screen show">
               <div className="success-circle">🎉</div>
               <h2>Account created!</h2>
-              <p>Welcome to PlannerHub! Taking you to the sign in page…</p>
+              <p>Check your email for a verification link, then sign in.</p>
               <button className="submit-btn" type="button" onClick={resetSignup}>
                 Sign In →
               </button>

@@ -3,7 +3,8 @@ import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 
 function hasSession() {
-  return !!sessionStorage.getItem("planner_session");
+  // Check for real JWT token instead of fake session object
+  return !!sessionStorage.getItem("access_token");
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
