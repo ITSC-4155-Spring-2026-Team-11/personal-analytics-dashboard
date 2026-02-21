@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+config.py
 
 # OS
 .DS_Store
@@ -19,9 +20,6 @@ database/app.db
 .vscode/
 .idea/
 
-# Environment Variables
-.env
-.env/
-
-# Nested project folder
-personal-analytics-dashboard/
+# Web
+node_modules/
+dist/

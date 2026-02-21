@@ -130,12 +130,11 @@ python main.py
 
 ## 5 Web Client Setup
 
-No build tools are required.
-Simply open:
+navigate to the react-version directory:
+cd web/react-version
+Run: npm install
 
-web/index.html
-
-in a modern web browser (Chrome, Edge, Firefox).
+Run: npm run dev
 
 ## 6 Running the Full System
 
@@ -152,7 +151,9 @@ python main.py
 
 3. Open the web client:
 
-web/index.html
+Navigate to the react directory and run npm install (only needed one time, the first time you run the program)
+
+run: npm run dev
 
 ## 7 Common Issues
 

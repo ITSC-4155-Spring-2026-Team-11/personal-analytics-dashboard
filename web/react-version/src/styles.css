@@ -1,0 +1,103 @@
+:root {
+  --bg: #0d0f14;
+  --panel: #151820;
+  --border: #232636;
+  --text: #e8eaf0;
+  --muted: #6b7083;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-size: 1.2rem; font-weight: 700; }
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+.signout-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: .85rem;
+  transition: background .2s;
+}
+.signout-btn:hover { background: var(--border); }
+
+main { padding: 40px 32px; }
+h1 { font-size: 1.6rem; margin-bottom: 8px; }
+p { color: var(--muted); }
+
+#output {
+  margin-top: 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  white-space: pre-wrap;
+}
+
+/* Login styling (matches the same theme) */
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.login-title { font-size: 1.2rem; font-weight: 700; margin: 0 0 6px; }
+.login-sub { color: var(--muted); margin: 0 0 14px; }
+
+.login-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+.login-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+.login-btn:hover { background: var(--border); }

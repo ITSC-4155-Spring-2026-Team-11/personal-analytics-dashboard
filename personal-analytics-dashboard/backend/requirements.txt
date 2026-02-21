@@ -1,8 +1,8 @@
 fastapi
 uvicorn
-pydantic
-email-validator
+pydantic[email]
 sqlalchemy
 requests
-python-dotenv
-pymysql
+bcrypt
+python-jose[cryptography]
+python-multipart
