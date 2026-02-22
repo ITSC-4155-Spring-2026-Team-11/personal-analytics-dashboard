@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+config.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+data/logs/
+
+# Database (optional: keep it if you want persistent dev DB)
+database/app.db
+
+# Editor
+.vscode/
+.idea/
+
+# Web
+node_modules/
+dist/
