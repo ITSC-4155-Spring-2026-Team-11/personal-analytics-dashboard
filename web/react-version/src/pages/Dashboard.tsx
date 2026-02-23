@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "http://localhost:8000";
@@ -39,7 +39,6 @@ export default function Dashboard() {
   const [importance, setImportance] = useState<number>(3);
   const [creating, setCreating] = useState(false);
 
-  const token = useMemo(() => sessionStorage.getItem("access_token"), []);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("planner_session");
@@ -201,8 +200,14 @@ export default function Dashboard() {
     <>
       <header>
         <div className="brand">📋 PlannerHub</div>
-        <div className="user-info">
+        <div className="user-info" style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <span>{`👋 Welcome, ${session.email ?? "User"}`}</span>
+
+          {/* NEW: Account button (safe UI navigation) */}
+          <button className="ghost-btn" type="button" onClick={() => nav("/account")}>
+            Account
+          </button>
+
           <button className="signout-btn" onClick={signOut}>
             Sign Out
           </button>
