@@ -7,6 +7,7 @@ bcrypt>=4.1.0
 python-multipart>=0.0.6
 pydantic[email-validation]>=2.5.0
 email-validator>=2.0.0
+requests
 
 # DB
 sqlalchemy>=2.0.0
