@@ -11,13 +11,21 @@ from backend.dependencies import get_db, get_current_user
 router = APIRouter()
 
 
-# ── Request schemas ───────────────────────────────────────────────────────────
+# ── Request schemas ──────────────────────────────────────────────────────────
 
 class TaskCreate(BaseModel):
     title:            str
     duration_minutes: Optional[int] = 30
     deadline:         Optional[str] = None
     importance:       Optional[int] = 3
+    task_type:        Optional[str] = "flexible"
+    fixed_start:      Optional[str] = None
+    fixed_end:        Optional[str] = None
+    location:         Optional[str] = None
+    energy_level:     Optional[str] = "moderate"
+    preferred_time:   Optional[str] = "none"
+    recurrence:       Optional[str] = "once"
+    recurrence_days:  Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -25,20 +33,23 @@ class TaskUpdate(BaseModel):
     duration_minutes: Optional[int] = None
     deadline:         Optional[str] = None
     importance:       Optional[int] = None
+    task_type:        Optional[str] = None
+    fixed_start:      Optional[str] = None
+    fixed_end:        Optional[str] = None
+    location:         Optional[str] = None
+    energy_level:     Optional[str] = None
+    preferred_time:   Optional[str] = None
+    recurrence:       Optional[str] = None
+    recurrence_days:  Optional[str] = None
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/")
 def list_tasks(
     db:           Session = Depends(get_db),
     current_user: User    = Depends(get_current_user),
 ):
-    """
-    Returns ONLY the tasks belonging to the logged-in user.
-    current_user is injected by the JWT dependency — the user_id filter
-    ensures no one can see anyone else's tasks, even if they guess an ID.
-    """
     tasks = db.query(Task).filter(Task.user_id == current_user.id).all()
     return {"tasks": tasks}
 
@@ -58,6 +69,14 @@ def create_task(
         duration_minutes = body.duration_minutes,
         deadline         = body.deadline,
         importance       = body.importance,
+        task_type        = body.task_type,
+        fixed_start      = body.fixed_start,
+        fixed_end        = body.fixed_end,
+        location         = body.location,
+        energy_level     = body.energy_level,
+        preferred_time   = body.preferred_time,
+        recurrence       = body.recurrence,
+        recurrence_days  = body.recurrence_days,
     )
     db.add(task)
     db.commit()
@@ -72,11 +91,6 @@ def update_task(
     db:           Session = Depends(get_db),
     current_user: User    = Depends(get_current_user),
 ):
-    """
-    Partially update a task's fields (title, duration, deadline, importance).
-    Only updates fields that are explicitly provided in the request body.
-    IDOR-safe: checks user_id before allowing any modification.
-    """
     task = db.query(Task).filter(
         Task.id      == task_id,
         Task.user_id == current_user.id,
@@ -89,17 +103,30 @@ def update_task(
         if not body.title.strip():
             raise HTTPException(status_code=422, detail="Task title cannot be empty")
         task.title = body.title.strip()
-
     if body.duration_minutes is not None:
         task.duration_minutes = body.duration_minutes
-
     if body.deadline is not None:
         task.deadline = body.deadline if body.deadline else None
-
     if body.importance is not None:
         if not 1 <= body.importance <= 5:
             raise HTTPException(status_code=422, detail="Importance must be between 1 and 5")
         task.importance = body.importance
+    if body.task_type is not None:
+        task.task_type = body.task_type
+    if body.fixed_start is not None:
+        task.fixed_start = body.fixed_start if body.fixed_start else None
+    if body.fixed_end is not None:
+        task.fixed_end = body.fixed_end if body.fixed_end else None
+    if body.location is not None:
+        task.location = body.location if body.location else None
+    if body.energy_level is not None:
+        task.energy_level = body.energy_level
+    if body.preferred_time is not None:
+        task.preferred_time = body.preferred_time
+    if body.recurrence is not None:
+        task.recurrence = body.recurrence
+    if body.recurrence_days is not None:
+        task.recurrence_days = body.recurrence_days if body.recurrence_days else None
 
     db.commit()
     db.refresh(task)
@@ -112,10 +139,6 @@ def toggle_complete(
     db:           Session = Depends(get_db),
     current_user: User    = Depends(get_current_user),
 ):
-    """
-    Toggles a task's completed state.
-    Sets completed_at timestamp when marking complete, clears it when undoing.
-    """
     task = db.query(Task).filter(
         Task.id      == task_id,
         Task.user_id == current_user.id,
@@ -138,11 +161,6 @@ def delete_task(
     db:           Session = Depends(get_db),
     current_user: User    = Depends(get_current_user),
 ):
-    """
-    Deletes a task — but ONLY if it belongs to the current user.
-    Without the user_id check, any logged-in user could delete anyone's task
-    just by guessing an ID (Insecure Direct Object Reference / IDOR).
-    """
     task = db.query(Task).filter(
         Task.id      == task_id,
         Task.user_id == current_user.id,
