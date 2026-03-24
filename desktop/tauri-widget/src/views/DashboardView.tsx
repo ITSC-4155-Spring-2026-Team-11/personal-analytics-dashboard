@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 
-const API = "http://localhost:8000";
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || "http://localhost:8000";
 
-type Session = { email?: string; loginTime?: string; name?: string };
+type Session = { email?: string; loginTime?: string };
 
 type Task = {
   id: number;
@@ -40,33 +41,33 @@ function getFirstDayOfMonth(year: number, month: number) {
 }
 
 const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December"
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
-export default function Dashboard() {
-  const nav = useNavigate();
+type Props = {
+  onSignOut: () => void;
+};
+
+export default function DashboardView({ onSignOut }: Props) {
   const [session, setSession] = useState<Session | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // 2FA banner
   const [totpEnabled, setTotpEnabled] = useState<boolean | null>(null);
   const [email2FAEnabled, setEmail2FAEnabled] = useState<boolean | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  // Add task modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState("");
-  const [duration, setDuration] = useState<number>(30);
-  const [deadline, setDeadline] = useState<string>("");
-  const [importance, setImportance] = useState<number>(3);
+  const [duration, setDuration] = useState(30);
+  const [deadline, setDeadline] = useState("");
+  const [importance, setImportance] = useState(3);
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Calendar
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
@@ -74,38 +75,54 @@ export default function Dashboard() {
   useEffect(() => {
     const raw = sessionStorage.getItem("planner_session");
     const t = sessionStorage.getItem("access_token");
-    if (!raw || !t) { nav("/login", { replace: true }); return; }
+    if (!raw || !t) {
+      onSignOut();
+      return;
+    }
     try {
       setSession(JSON.parse(raw));
     } catch {
-      sessionStorage.clear();
-      nav("/login", { replace: true });
+      onSignOut();
     }
-  }, [nav]);
+  }, [onSignOut]);
 
-  async function fetchTasks() {
+  const fetchTasks = useCallback(async () => {
     const t = sessionStorage.getItem("access_token");
-    if (!t) { nav("/login", { replace: true }); return; }
-    setLoading(true); setErr(null);
+    if (!t) {
+      onSignOut();
+      return;
+    }
+    setLoading(true);
+    setErr(null);
     try {
-      const res = await fetch(`${API}/tasks/`, { headers: { Authorization: `Bearer ${t}` } });
-      if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
+      const res = await fetch(`${API_BASE}/tasks/`, {
+        headers: { Authorization: `Bearer ${t}` },
+      });
+      if (res.status === 401) {
+        onSignOut();
+        return;
+      }
       const data = await res.json();
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      emit("tasks-updated").catch(() => {});
     } catch {
-      setErr("Could not load tasks. Is the backend running on :8000?");
+      setErr("Could not load tasks. Is the backend running?");
     } finally {
       setLoading(false);
     }
-  }
+  }, [onSignOut]);
 
-  useEffect(() => { if (session) fetchTasks(); }, [session]);
+  useEffect(() => {
+    if (session) fetchTasks();
+  }, [session, fetchTasks]);
 
   const fetch2FAStatus = useCallback(async () => {
     const token = sessionStorage.getItem("access_token");
     if (!token) return;
     try {
-      const res = await fetch(`${API}/auth/2fa/status`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/auth/2fa/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setTotpEnabled(!!data.totp_enabled);
@@ -117,9 +134,10 @@ export default function Dashboard() {
     }
   }, []);
 
-  useEffect(() => { if (session) fetch2FAStatus(); }, [session, fetch2FAStatus]);
+  useEffect(() => {
+    if (session) fetch2FAStatus();
+  }, [session, fetch2FAStatus]);
 
-  // Close modal on outside click
   useEffect(() => {
     if (!showAddModal) return;
     function handleClick(e: MouseEvent) {
@@ -131,7 +149,6 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showAddModal]);
 
-  // Close modal on Escape
   useEffect(() => {
     if (!showAddModal) return;
     function handleKey(e: KeyboardEvent) {
@@ -144,21 +161,41 @@ export default function Dashboard() {
   async function createTask(e: React.FormEvent) {
     e.preventDefault();
     const t = sessionStorage.getItem("access_token");
-    if (!t) return nav("/login", { replace: true });
+    if (!t) return onSignOut();
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
-    setCreating(true); setCreateErr(null);
+    setCreating(true);
+    setCreateErr(null);
     try {
-      const res = await fetch(`${API}/tasks/`, {
+      const res = await fetch(`${API_BASE}/tasks/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
-        body: JSON.stringify({ title: cleanTitle, duration_minutes: duration, deadline: deadline || null, importance }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${t}`,
+        },
+        body: JSON.stringify({
+          title: cleanTitle,
+          duration_minutes: duration,
+          deadline: deadline || null,
+          importance,
+        }),
       });
-      if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
-      if (!res.ok) { const msg = await res.text(); setCreateErr(msg || "Failed to create task."); return; }
-      setTitle(""); setDuration(30); setDeadline(""); setImportance(3);
+      if (res.status === 401) {
+        onSignOut();
+        return;
+      }
+      if (!res.ok) {
+        const msg = await res.text();
+        setCreateErr(msg || "Failed to create task.");
+        return;
+      }
+      setTitle("");
+      setDuration(30);
+      setDeadline("");
+      setImportance(3);
       setShowAddModal(false);
       await fetchTasks();
+      emit("tasks-updated").catch(() => {});
     } catch {
       setCreateErr("Failed to create task. Is the backend running?");
     } finally {
@@ -168,16 +205,24 @@ export default function Dashboard() {
 
   async function deleteTask(id: number) {
     const t = sessionStorage.getItem("access_token");
-    if (!t) return nav("/login", { replace: true });
+    if (!t) return onSignOut();
     const prev = tasks;
     setTasks((x) => x.filter((task) => task.id !== id));
     try {
-      const res = await fetch(`${API}/tasks/${id}`, {
+      const res = await fetch(`${API_BASE}/tasks/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${t}` },
       });
-      if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
-      if (!res.ok) { setTasks(prev); setErr("Could not delete task."); }
+      if (res.status === 401) {
+        onSignOut();
+        return;
+      }
+      if (!res.ok) {
+        setTasks(prev);
+        setErr("Could not delete task.");
+      } else {
+        emit("tasks-updated").catch(() => {});
+      }
     } catch {
       setTasks(prev);
       setErr("Could not delete task. Is the backend running?");
@@ -188,26 +233,24 @@ export default function Dashboard() {
     const refreshToken = sessionStorage.getItem("refresh_token");
     if (refreshToken) {
       try {
-        await fetch(`${API}/auth/logout`, {
+        await fetch(`${API_BASE}/auth/logout`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
       } catch {}
     }
-    sessionStorage.clear(); localStorage.clear();
-    nav("/login", { replace: true });
+    sessionStorage.clear();
+    localStorage.clear();
+    onSignOut();
   }
 
   if (!session) return null;
 
-  const profileRaw = localStorage.getItem("planner_profile");
-  const profile = profileRaw ? JSON.parse(profileRaw) : null;
-  const displayName = profile?.fullName?.trim() || session.email?.split("@")[0] || "User";
+  const displayName = session.email?.split("@")[0] || "User";
+  const show2FABanner =
+    !bannerDismissed && totpEnabled === false && email2FAEnabled === false;
 
-  const show2FABanner = !bannerDismissed && totpEnabled === false && email2FAEnabled === false;
-
-  // Calendar helpers
   const daysInMonth = getDaysInMonth(calYear, calMonth);
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
   const calDays: (number | null)[] = [];
@@ -219,66 +262,91 @@ export default function Dashboard() {
     return tasks.filter((t) => t.deadline === dateStr);
   }
 
-  function prevMonth() {
-    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
-    else setCalMonth(m => m - 1);
-  }
-  function nextMonth() {
-    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
-    else setCalMonth(m => m + 1);
-  }
-
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const upcomingTasks = [...tasks]
-    .filter(t => t.deadline && t.deadline >= todayStr)
+    .filter((t) => t.deadline && t.deadline >= todayStr)
     .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
-  const noDeadlineTasks = tasks.filter(t => !t.deadline);
+  const noDeadlineTasks = tasks.filter((t) => !t.deadline);
 
   return (
-    <>
-      <header>
-        <div className="brand">📋 PlannerHub</div>
+    <div className="dashboard-wrap">
+      <header className="dash-header">
+        <div className="brand">Personal Analytics</div>
         <div className="user-info">
-          <span className="header-greeting">👋 {displayName}</span>
-          <button className="ghost-btn" type="button" onClick={() => nav("/account")}>Account</button>
-          <button className="signout-btn" onClick={signOut}>Sign Out</button>
+          <span className="header-greeting">{displayName}</span>
+          <button
+            className="ghost-btn"
+            type="button"
+            onClick={() => invoke("show_widget_window")}
+          >
+            Show widget
+          </button>
+          <button
+            className="ghost-btn"
+            type="button"
+            onClick={() => invoke("hide_widget_window")}
+          >
+            Hide widget
+          </button>
+          <button className="signout-btn" onClick={signOut}>
+            Sign out
+          </button>
         </div>
       </header>
 
-      {/* 2FA Banner */}
       {show2FABanner && (
         <div className="twofa-banner">
           <div className="twofa-banner-content">
             <span className="twofa-banner-icon">🔐</span>
             <div>
               <strong>Secure your account</strong>
-              <span className="twofa-banner-text"> — Two-factor authentication is not enabled. Enable it in your </span>
-              <button className="twofa-banner-link" onClick={() => nav("/account")}>Account settings</button>.
+              <span className="twofa-banner-text">
+                {" "}
+                — Two-factor authentication is not enabled. Enable it in the web app Account settings.
+              </span>
             </div>
           </div>
-          <button className="twofa-banner-dismiss" onClick={() => setBannerDismissed(true)} aria-label="Dismiss">✕</button>
+          <button
+            className="twofa-banner-dismiss"
+            onClick={() => setBannerDismissed(true)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       <main className="dash">
         <aside className="sidebar">
           <div className="side-title">Dashboard</div>
-          <button className="side-pill" type="button">Taskboard</button>
-          <button className="side-link" type="button" onClick={() => nav("/account")}>Account settings</button>
-          <button className="side-link side-link-danger" type="button" onClick={signOut}>Sign out</button>
+          <button className="side-pill" type="button">
+            Taskboard
+          </button>
+          <button className="side-link side-link-danger" type="button" onClick={signOut}>
+            Sign out
+          </button>
         </aside>
 
         <div className="dash-content">
-          {/* Tasks Panel */}
           <section className="panel">
             <div className="panel-head">
               <div>
                 <h1 className="panel-title">My Tasks</h1>
-                <p className="panel-sub">{tasks.length} task{tasks.length !== 1 ? "s" : ""} total</p>
+                <p className="panel-sub">
+                  {tasks.length} task{tasks.length !== 1 ? "s" : ""} total
+                </p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="ghost-btn" type="button" onClick={fetchTasks}>↻ Refresh</button>
-                <button className="primary-btn" type="button" onClick={() => setShowAddModal(true)}>+ Add Task</button>
+                <button className="ghost-btn" type="button" onClick={fetchTasks}>
+                  ↻ Refresh
+                </button>
+                <button
+                  className="primary-btn"
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                >
+                  + Add Task
+                </button>
               </div>
             </div>
 
@@ -302,8 +370,22 @@ export default function Dashboard() {
                           <div className="task-main">
                             <div className="task-title">{t.title}</div>
                             <div className="task-meta">
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: "50%", background: importanceDot(t.importance), display: "inline-block" }}></span>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: "50%",
+                                    background: importanceDot(t.importance),
+                                    display: "inline-block",
+                                  }}
+                                />
                                 {importanceLabel(t.importance)}
                               </span>
                               <span>•</span>
@@ -312,28 +394,59 @@ export default function Dashboard() {
                               <span className="deadline-badge">📅 {t.deadline}</span>
                             </div>
                           </div>
-                          <button className="danger-btn" onClick={() => deleteTask(t.id)}>Delete</button>
+                          <button
+                            className="danger-btn"
+                            onClick={() => deleteTask(t.id)}
+                          >
+                            Delete
+                          </button>
                         </article>
                       ))}
                     </>
                   )}
                   {noDeadlineTasks.length > 0 && (
                     <>
-                      <div className="task-group-label" style={{ marginTop: upcomingTasks.length > 0 ? 16 : 0 }}>No deadline</div>
+                      <div
+                        className="task-group-label"
+                        style={{
+                          marginTop: upcomingTasks.length > 0 ? 16 : 0,
+                        }}
+                      >
+                        No deadline
+                      </div>
                       {noDeadlineTasks.map((t) => (
                         <article className="task" key={t.id}>
                           <div className="task-main">
                             <div className="task-title">{t.title}</div>
                             <div className="task-meta">
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <span style={{ width: 7, height: 7, borderRadius: "50%", background: importanceDot(t.importance), display: "inline-block" }}></span>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: "50%",
+                                    background: importanceDot(t.importance),
+                                    display: "inline-block",
+                                  }}
+                                />
                                 {importanceLabel(t.importance)}
                               </span>
                               <span>•</span>
                               <span>{t.duration_minutes} min</span>
                             </div>
                           </div>
-                          <button className="danger-btn" onClick={() => deleteTask(t.id)}>Delete</button>
+                          <button
+                            className="danger-btn"
+                            onClick={() => deleteTask(t.id)}
+                          >
+                            Delete
+                          </button>
                         </article>
                       ))}
                     </>
@@ -343,32 +456,73 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* Calendar Panel */}
           <section className="panel calendar-panel">
             <div className="calendar-header">
-              <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
-              <h2 className="calendar-title">{MONTH_NAMES[calMonth]} {calYear}</h2>
-              <button className="cal-nav-btn" onClick={nextMonth}>›</button>
+              <button
+                className="cal-nav-btn"
+                onClick={() =>
+                  calMonth === 0
+                    ? (setCalYear((y) => y - 1), setCalMonth(11))
+                    : setCalMonth((m) => m - 1)
+                }
+              >
+                ‹
+              </button>
+              <h2 className="calendar-title">
+                {MONTH_NAMES[calMonth]} {calYear}
+              </h2>
+              <button
+                className="cal-nav-btn"
+                onClick={() =>
+                  calMonth === 11
+                    ? (setCalYear((y) => y + 1), setCalMonth(0))
+                    : setCalMonth((m) => m + 1)
+                }
+              >
+                ›
+              </button>
             </div>
 
             <div className="calendar-grid">
-              {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
-                <div key={d} className="cal-day-name">{d}</div>
+              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+                <div key={d} className="cal-day-name">
+                  {d}
+                </div>
               ))}
               {calDays.map((day, i) => {
-                if (!day) return <div key={`empty-${i}`} className="cal-day cal-day-empty" />;
+                if (!day)
+                  return (
+                    <div
+                      key={`empty-${i}`}
+                      className="cal-day cal-day-empty"
+                    />
+                  );
                 const dayTasks = tasksForDay(day);
-                const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+                const isToday =
+                  day === today.getDate() &&
+                  calMonth === today.getMonth() &&
+                  calYear === today.getFullYear();
                 return (
-                  <div key={day} className={`cal-day ${isToday ? "cal-day-today" : ""} ${dayTasks.length > 0 ? "cal-day-has-tasks" : ""}`}>
+                  <div
+                    key={day}
+                    className={`cal-day ${isToday ? "cal-day-today" : ""} ${dayTasks.length > 0 ? "cal-day-has-tasks" : ""}`}
+                  >
                     <span className="cal-day-num">{day}</span>
-                    {dayTasks.slice(0, 2).map(t => (
-                      <div key={t.id} className="cal-task-chip" style={{ borderLeftColor: importanceDot(t.importance) }}>
+                    {dayTasks.slice(0, 2).map((t) => (
+                      <div
+                        key={t.id}
+                        className="cal-task-chip"
+                        style={{
+                          borderLeftColor: importanceDot(t.importance),
+                        }}
+                      >
                         {t.title}
                       </div>
                     ))}
                     {dayTasks.length > 2 && (
-                      <div className="cal-task-more">+{dayTasks.length - 2} more</div>
+                      <div className="cal-task-more">
+                        +{dayTasks.length - 2} more
+                      </div>
                     )}
                   </div>
                 );
@@ -378,16 +532,24 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Add Task Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal" ref={modalRef}>
             <div className="modal-header">
               <h2 className="modal-title">Add New Task</h2>
-              <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
+              <button
+                className="modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                ✕
+              </button>
             </div>
 
-            {createErr && <div className="error" style={{ marginBottom: 16 }}>{createErr}</div>}
+            {createErr && (
+              <div className="error" style={{ marginBottom: 16 }}>
+                {createErr}
+              </div>
+            )}
 
             <form onSubmit={createTask}>
               <div className="modal-field">
@@ -428,26 +590,38 @@ export default function Dashboard() {
               <div className="modal-field">
                 <label>Importance</label>
                 <div className="importance-picker">
-                  {[1,2,3,4,5].map(n => (
+                  {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
                       type="button"
                       className={`importance-btn ${importance === n ? "importance-btn-active" : ""}`}
-                      style={{ "--dot-color": importanceDot(n) } as React.CSSProperties}
+                      style={
+                        { "--dot-color": importanceDot(n) } as React.CSSProperties
+                      }
                       onClick={() => setImportance(n)}
                     >
                       {n}
                     </button>
                   ))}
                 </div>
-                <div className="importance-label-text">{importanceLabel(importance)}</div>
+                <div className="importance-label-text">
+                  {importanceLabel(importance)}
+                </div>
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="ghost-btn" onClick={() => setShowAddModal(false)}>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => setShowAddModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="primary-btn" disabled={creating || !title.trim()}>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={creating || !title.trim()}
+                >
                   {creating ? "Adding…" : "Add Task"}
                 </button>
               </div>
@@ -455,6 +629,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
