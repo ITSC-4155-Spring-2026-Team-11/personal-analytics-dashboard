@@ -567,6 +567,78 @@ header .user-info { display: flex; align-items: center; gap: 10px; flex-shrink: 
   color: var(--text);
   font-weight: 500;
 }
+/* ── Task type picker ── */
+.type-picker { display: flex; flex-direction: column; gap: 8px; }
+.type-btn {
+  display: flex; flex-direction: column; gap: 3px; padding: 12px 14px;
+  border-radius: 10px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-family: 'DM Sans', sans-serif; cursor: pointer;
+  text-align: left; transition: var(--trans);
+}
+.type-btn:hover { border-color: var(--accent); background: rgba(108,99,255,.04); }
+.type-btn-active { border-color: var(--accent) !important; background: rgba(108,99,255,.1) !important; }
+.type-btn-label { font-weight: 700; font-size: 0.9rem; }
+.type-btn-desc { font-size: 0.76rem; color: var(--muted); }
+
+/* ── Pill groups ── */
+.pill-group { display: flex; flex-direction: column; gap: 6px; }
+.pill-group-row { flex-direction: row; flex-wrap: wrap; }
+.pill-btn {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 14px;
+  border-radius: 10px; border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-family: 'DM Sans', sans-serif; cursor: pointer;
+  text-align: left; transition: var(--trans); font-size: 0.86rem; font-weight: 600;
+}
+.pill-btn:hover { border-color: var(--accent); }
+.pill-btn-active { border-color: var(--accent2) !important; background: rgba(56,217,169,.08) !important; color: var(--accent2) !important; }
+.pill-btn-sub { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+.pill-btn-sm {
+  padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: var(--trans); white-space: nowrap;
+}
+.pill-btn-sm:hover { border-color: var(--accent); color: var(--text); }
+.pill-btn-sm-active { border-color: var(--accent) !important; background: rgba(108,99,255,.12) !important; color: var(--accent) !important; }
+
+/* ── Day picker (weekdays) ── */
+.day-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: var(--trans);
+  display: flex; align-items: center; justify-content: center;
+}
+.day-btn:hover { border-color: var(--accent); color: var(--text); }
+.day-btn-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── Collapsible sections ── */
+.collapsible-section { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.collapsible-toggle {
+  width: 100%; display: flex; align-items: center; background: none; border: none;
+  color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.86rem;
+  font-weight: 600; cursor: pointer; padding: 0; text-align: left;
+}
+.collapsible-arrow { margin-left: auto; font-size: 0.7rem; color: var(--muted); }
+
+/* ── Taller modal ── */
+.modal-tall { max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; }
+
+/* ── Day detail popup ── */
+.day-popup {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; width: 100%; max-width: 520px;
+  max-height: 88vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5); animation: modalIn .2s cubic-bezier(.34,1.56,.64,1);
+}
+.day-hour-grid { flex: 1; overflow-y: auto; min-height: 0; }
+.day-hour-grid::-webkit-scrollbar { width: 4px; }
+.day-hour-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.day-allday-chip {
+  display: flex; align-items: center; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent2);
+  background: rgba(255,255,255,.02); margin-bottom: 4px;
+}
+.day-timed-task:hover { filter: brightness(1.2); }
 
 /* ── Responsive ── */
 @media (max-width: 1100px) { .account-layout { grid-template-columns: 1fr; } .account-side { position: static; } }
