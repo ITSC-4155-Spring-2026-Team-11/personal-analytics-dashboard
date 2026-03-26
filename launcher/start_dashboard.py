@@ -178,9 +178,18 @@ def main() -> None:
         try:
             tauri_proc = launch_client(root, base)
         except LaunchError as e:
-            print(str(e), file=sys.stderr)
-            kill()
-            sys.exit(1)
+            mode = launch_mode()
+            if mode == "tauri":
+                # Fresh machines often don't have Rust/Tauri set up; in that case,
+                # still open the app in a browser so the user isn't blocked.
+                print(str(e), file=sys.stderr)
+                print("Falling back to browser (install Tauri/Rust to launch desktop app).", file=sys.stderr)
+                webbrowser.open(f"{base}{LOGIN}")
+                tauri_proc = None
+            else:
+                print(str(e), file=sys.stderr)
+                kill()
+                sys.exit(1)
         proc.wait()
     except KeyboardInterrupt:
         kill()
