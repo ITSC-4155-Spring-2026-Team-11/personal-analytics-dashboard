@@ -12,7 +12,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# ── Auth models ───────────────────────────────────────────────────────────────
+# ── Auth models ──────────────────────────────────────────────────────────────
 
 class User(Base):
     __tablename__ = "users"
@@ -89,7 +89,7 @@ class PasswordResetToken(Base):
     user: Mapped["User"] = relationship(back_populates="password_reset_tokens")
 
 
-# ── App models ────────────────────────────────────────────────────────────────
+# ── App models ───────────────────────────────────────────────────────────────
 
 class Task(Base):
     __tablename__ = "tasks"
