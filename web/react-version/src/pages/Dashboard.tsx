@@ -558,6 +558,30 @@ export default function Dashboard() {
     };
   }
 
+  function getRecurrenceDates(f: TaskForm): string[] {
+    const baseDate = f.deadline || toDateStr(today);
+    const [y, mo, d] = baseDate.split("-").map(Number);
+    const start = new Date(y, mo - 1, d);
+
+    if (f.recurrence === "once" || !f.recurrence) return [baseDate];
+
+    if (f.recurrence === "daily") {
+      return Array.from({ length: 30 }, (_, i) => toDateStr(addDays(start, i)));
+    }
+
+    if (f.recurrence === "weekly") {
+      if (f.recurrence_days.length === 0) return [];
+      const jsWeekdays = f.recurrence_days.map(d => d === 6 ? 0 : d + 1);
+      const dates: string[] = [];
+      for (let i = 0; i < 30; i++) {
+        const date = addDays(start, i);
+        if (jsWeekdays.includes(date.getDay())) dates.push(toDateStr(date));
+      }
+      return dates;
+    }
+
+    return [baseDate];
+  }
 
   // Close Task Survey modal on outside click / Escape
   useEffect(() => {
@@ -607,10 +631,17 @@ export default function Dashboard() {
     if (!t) return nav("/login", { replace: true });
     setCreating(true); setCreateErr(null);
     try {
-      const payload = formToPayload(form);
-      const res = await fetch(`${API}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
-      if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
-      if (!res.ok) { setCreateErr(friendlyError(await res.text(), "Failed to create task.")); return; }
+      const dates = getRecurrenceDates(form);
+      const basePayload = formToPayload(form);
+      for (const date of dates) {
+        const deadline = (form.task_type === "due_by" || form.task_type === "set_time")
+          ? date
+          : (form.recurrence !== "once" ? date : null);
+        const payload = { ...basePayload, deadline };
+        const res = await fetch(`${API}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
+        if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
+        if (!res.ok) { setCreateErr(friendlyError(await res.text(), "Failed to create task.")); return; }
+      }
       setShowAddModal(false); await fetchTasks();
     } catch { setCreateErr("Failed to create task. Is the backend running?"); }
     finally { setCreating(false); }
