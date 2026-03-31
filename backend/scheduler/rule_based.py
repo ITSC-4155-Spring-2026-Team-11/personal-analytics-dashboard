@@ -202,11 +202,46 @@ def build_schedule(
     # ── Step 4: Rank flexible/semi tasks ──────────────────────────────────────
     ranked_tasks = rank_tasks(flexible_raw, today_str, prefs)
 
-    # ── Step 5: Fill free slots ───────────────────────────────────────────────
-    placed   : list[ScheduledTask] = []
-    overflow : list[ScheduledTask] = []
+    # ── Step 5: Fill free slots (respecting schedule_density) ────────────────
+    # Compute total free minutes and cap how much of it flexible/semi tasks can fill.
+    # schedule_density controls this: relaxed=60%, balanced=80%, packed=100%.
+    total_free_minutes = sum(end - start for start, end in free_slots)
+    density = prefs.get("schedule_density", "relaxed")
+    density_fill_ratio = {"relaxed": 0.6, "balanced": 0.8, "packed": 1.0}.get(density, 0.6)
+    max_flexible_minutes = int(total_free_minutes * density_fill_ratio)
+
+    placed          : list[ScheduledTask] = []
+    overflow        : list[ScheduledTask] = []
+    placed_minutes  : int = 0
+    placed_task_ids : set[int] = set()
 
     for task in ranked_tasks:
+        task_id_val   = task["id"]
+        task_duration = task.get("duration_minutes", 30)
+
+        # Never schedule the same task twice in one day.
+        if task_id_val in placed_task_ids:
+            continue
+
+        # Semi tasks (due-by) with urgent deadlines always get a slot attempt
+        # regardless of the density cap, so they don't silently vanish.
+        is_urgent_semi = (
+            task.get("task_type") == "semi"
+            and task.get("deadline") == today_str
+        )
+
+        if not is_urgent_semi and placed_minutes >= max_flexible_minutes:
+            overflow.append(ScheduledTask(
+                task_id           = task_id_val,
+                title             = task["title"],
+                start_min         = -1,
+                end_min           = -1,
+                energy_level      = task.get("energy_level", "medium"),
+                task_type         = task.get("task_type", "flexible"),
+                times_rescheduled = task.get("times_rescheduled", 0),
+            ))
+            continue
+
         best_start, best_score = find_best_slot(
             task         = task,
             free_slots   = free_slots,
@@ -220,6 +255,8 @@ def build_schedule(
         if best_start is not None:
             st = make_scheduled_task(task, best_start)
             placed.append(st)
+            placed_task_ids.add(task_id_val)
+            placed_minutes += task_duration
         else:
             # No slot found -- goes to overflow
             overflow.append(ScheduledTask(
