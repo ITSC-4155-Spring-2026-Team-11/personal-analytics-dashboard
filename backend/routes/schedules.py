@@ -125,21 +125,16 @@ def get_tasks_for_date(
                 eligible.append(task)
             continue
 
-        # Non-recurring: include if deadline is today or no deadline,
-        # but skip if already scheduled today (prevents re-adding on refresh).
+        # Non-recurring: include if deadline is today or no deadline
         if task.deadline is None or task.deadline == date_str:
-            if task.last_scheduled_date != date_str:
-                eligible.append(task)
+            eligible.append(task)
             continue
 
-        # Semi-flexible tasks: only pull in if deadline is within 7 days.
-        # Tasks with distant deadlines shouldn't flood today's schedule.
+        # Semi-flexible tasks with a future deadline still get scheduled today
+        # if they haven't been placed yet (last_scheduled_date is not today)
         if task.task_type == "semi" and task.deadline and task.deadline >= date_str:
-            from datetime import timedelta
-            deadline_date = date_type.fromisoformat(task.deadline)
-            if (deadline_date - target_date).days <= 7:
-                if task.last_scheduled_date != date_str:
-                    eligible.append(task)
+            if task.last_scheduled_date != date_str:
+                eligible.append(task)
 
     return eligible
 
@@ -208,23 +203,14 @@ def _build_for_date(user: User, date_str: str, db: Session) -> dict:
     prefs_dict = prefs_to_dict(prefs_obj)
 
     # Get eligible tasks for this date
-    tasks      = get_tasks_for_date(user.id, date_str, db)
+    tasks     = get_tasks_for_date(user.id, date_str, db)
     task_dicts = [task_to_dict(t) for t in tasks]
 
-    # Build schedule
+    # Build and return schedule
     result = build_schedule(
         tasks     = task_dicts,
         prefs     = prefs_dict if prefs_dict else None,
         today_str = date_str,
     )
-
-    # Mark scheduled tasks so they aren't re-added on the next refresh.
-    scheduled_ids = {item["task_id"] for item in result.get("scheduled", [])}
-    if scheduled_ids:
-        tasks_by_id = {t.id: t for t in tasks}
-        for task_id in scheduled_ids:
-            if task_id in tasks_by_id:
-                tasks_by_id[task_id].last_scheduled_date = date_str
-        db.commit()
 
     return result
