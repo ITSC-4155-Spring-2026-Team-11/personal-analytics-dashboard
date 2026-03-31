@@ -22,17 +22,45 @@ body {
   font-family: 'DM Sans', sans-serif; min-height: 100vh; display: block; place-items: unset;
 }
 
-/* ── Header ── */
-header {
-  display: flex; align-items: center; justify-content: space-between;
+/* ── Header (single row: Account, Login, etc.) ── */
+header:not(.header-shell) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 8px 28px;
   min-height: 58px;
   height: auto;
   flex-wrap: wrap;
   row-gap: 8px;
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 100; gap: 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 12px;
   box-sizing: border-box;
+}
+
+/* ── Header (two rows: avoids clipping actions on narrow Tauri windows) ── */
+header.header-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-sizing: border-box;
+}
+.header-row-1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 28px;
+  min-height: 52px;
 }
 header .brand {
   font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem;
@@ -44,7 +72,23 @@ header .user-info {
   min-width: 0;
   max-width: 100%;
 }
+header .user-info--compact {
+  flex-shrink: 0;
+}
 .header-greeting { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.header-row-2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 28px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+}
+.widget-show-btn--hero {
+  font-size: 0.95rem;
+  padding: 10px 18px;
+}
 
 /* ── 2FA Banner ── */
 .twofa-banner {

@@ -1212,15 +1212,21 @@ export default function Dashboard() {
 
   return (
     <>
-      <header>
-        <div className="brand">📋 PlannerHub</div>
-        <div className="user-info">
-          <span className="header-greeting">👋 {displayName}</span>
+      <header className="header-shell">
+        <div className="header-row-1">
+          <div className="brand">📋 PlannerHub</div>
+          <div className="user-info user-info--compact">
+            <span className="header-greeting">👋 {displayName}</span>
+            <button className="ghost-btn" type="button" onClick={() => nav("/account")}>Account</button>
+            <button className="signout-btn" onClick={signOut}>Sign Out</button>
+          </div>
+        </div>
+        <div className="header-row-2" aria-label="Quick actions">
           <button
             type="button"
-            className="widget-show-btn"
+            className="widget-show-btn widget-show-btn--hero"
             onClick={() => void openFloatingWidget()}
-            title="Opens the small floating task window (tray: Show Widget)"
+            title="Opens the small floating task window (also: system tray → Show Widget)"
           >
             Show widget
           </button>
@@ -1235,8 +1241,6 @@ export default function Dashboard() {
           <button className="eod-btn" type="button" onClick={openEODModal}>
             End of Day Check-In
           </button>
-          <button className="ghost-btn" type="button" onClick={() => nav("/account")}>Account</button>
-          <button className="signout-btn" onClick={signOut}>Sign Out</button>
         </div>
       </header>
 
