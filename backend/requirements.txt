@@ -6,3 +6,6 @@ requests
 bcrypt
 python-jose[cryptography]
 python-multipart
+python-dotenv
+pytest
+httpx
