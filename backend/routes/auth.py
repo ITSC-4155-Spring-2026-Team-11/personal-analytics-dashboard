@@ -22,7 +22,7 @@ from backend.security import (
     create_2fa_pending_token, decode_2fa_pending_token,
 )
 from backend.email_utils import send_verification_email, send_2fa_code_email, send_password_reset_email
-from backend.config import MIN_PASSWORD_LENGTH, VERIFICATION_TOKEN_EXPIRE_HOURS, EMAIL_2FA_CODE_EXPIRE_MINUTES, PASSWORD_RESET_TOKEN_EXPIRE_HOURS
+from backend.config import MIN_PASSWORD_LENGTH, VERIFICATION_TOKEN_EXPIRE_HOURS, EMAIL_2FA_CODE_EXPIRE_MINUTES, PASSWORD_RESET_TOKEN_EXPIRE_HOURS, DISABLE_SMTP_SENDING
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -115,21 +115,25 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, 
     db.add(user)
     db.flush()
 
-    raw_token = generate_verification_token()
-    token_row = EmailVerificationToken(
-        user_id    = user.id,
-        token      = raw_token,
-        expires_at = _utc_now() + timedelta(hours=VERIFICATION_TOKEN_EXPIRE_HOURS),
-    )
-    db.add(token_row)
-    db.commit()
-
-    try:
-        send_verification_email(to=email, name=str(user.name), token=raw_token)
-    except Exception:
-        logger.exception(
-            "Failed to send verification email (check SMTP_* and FROM_EMAIL in .env; see server logs)"
+    if DISABLE_SMTP_SENDING:
+        user.is_verified = True
+        db.commit()
+    else:
+        raw_token = generate_verification_token()
+        token_row = EmailVerificationToken(
+            user_id    = user.id,
+            token      = raw_token,
+            expires_at = _utc_now() + timedelta(hours=VERIFICATION_TOKEN_EXPIRE_HOURS),
         )
+        db.add(token_row)
+        db.commit()
+
+        try:
+            send_verification_email(to=email, name=str(user.name), token=raw_token)
+        except Exception:
+            logger.exception(
+                "Failed to send verification email (check SMTP_* and FROM_EMAIL in .env; see server logs)"
+            )
 
     return {"message": "If that email is new, a verification link has been sent."}
 
