@@ -8,6 +8,7 @@ import TauriFloatingWidget from "./pages/TauriFloatingWidget.tsx";
 import Landing from "./pages/Landing.tsx";
 import About from "./pages/About.tsx";
 import MeetTheTeam from "./pages/MeetTheTeam.tsx";
+import Analytics from "./pages/Analytics.tsx";
 
 function isTauriWidgetUrl() {
   if (typeof window === "undefined") return false;
@@ -41,6 +42,14 @@ export default function App() {
         element={
           <Protected>
             <Dashboard />
+          </Protected>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <Protected>
+            <Analytics />
           </Protected>
         }
       />

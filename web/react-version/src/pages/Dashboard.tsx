@@ -11,6 +11,7 @@ type Session = { email?: string; loginTime?: string; name?: string };
 type Task = {
   id: number;
   title: string;
+  category: string;
   duration_minutes: number;
   deadline: string | null;
   importance: number;
@@ -165,6 +166,13 @@ const RECURRENCE_OPTIONS = [
 
 const WEEKDAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+const CATEGORIES = [
+  { value: "Work",     color: "#6c63ff" },
+  { value: "Study",    color: "#74c0fc" },
+  { value: "Exercise", color: "#69db7c" },
+  { value: "Rest",     color: "#ffd43b" },
+];
+
 function blankForm(prefillDate?: string, prefillHour?: number) {
   return {
     title: "",
@@ -179,6 +187,7 @@ function blankForm(prefillDate?: string, prefillHour?: number) {
     preferred_time: "none",
     recurrence: "once",
     recurrence_days: [] as number[],
+    category: "Work",
   };
 }
 
@@ -229,6 +238,22 @@ function TaskFormFields({ f, setF, err: formErr, showOpt, setShowOpt, showRec, s
       <div className="modal-field">
         <label>Task name</label>
         <input className="input" placeholder="What needs to be done?" value={f.title} onChange={e => upd({ title: e.target.value })} maxLength={120} autoFocus />
+      </div>
+      <div className="modal-field">
+        <label>Category</label>
+        <div className="pill-group pill-group-row">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.value}
+              type="button"
+              className={`pill-btn-sm ${f.category === cat.value ? "pill-btn-sm-active" : ""}`}
+              style={f.category === cat.value ? { borderColor: cat.color, color: cat.color, background: `${cat.color}18` } : {}}
+              onClick={() => upd({ category: cat.value })}
+            >
+              {cat.value}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="modal-field">
         <label>Task type <span style={{ color: "var(--error)" }}>*</span></label>
@@ -539,6 +564,7 @@ export default function Dashboard() {
       fixed_start: t.fixed_start ?? "", fixed_end: t.fixed_end ?? "",
       location: t.location ?? "", deadline: t.deadline ?? "",
       duration_minutes: t.duration_minutes, importance: t.importance,
+      category: t.category ?? "Work",
       energy_level: reverseEnergyMap[t.energy_level ?? "medium"] ?? t.energy_level ?? "moderate",
       preferred_time: t.preferred_time ?? "none",
       recurrence: reverseRecurMap[t.recurrence ?? "none"] ?? t.recurrence ?? "once",
@@ -556,8 +582,13 @@ export default function Dashboard() {
     return {
       title: f.title.trim(),
       duration_minutes: f.duration_minutes || 30,
-      deadline: (f.task_type === "due_by" || f.task_type === "set_time") ? (f.deadline || null) : null,
+      deadline: (f.task_type === "due_by" || f.task_type === "set_time")
+        ? (f.deadline || null)
+        : (f.task_type === "flexible" && f.recurrence && f.recurrence !== "once")
+          ? (f.deadline || toDateStr(today))
+          : null,
       importance: f.importance,
+      category: f.category,
       task_type:    taskTypeMap[f.task_type]    ?? f.task_type,
       fixed_start: f.task_type === "set_time" ? (f.fixed_start || null) : null,
       fixed_end: (f.task_type === "set_time" || f.task_type === "due_by") ? (f.fixed_end || null) : null,
@@ -642,10 +673,11 @@ export default function Dashboard() {
     if (!t) return nav("/login", { replace: true });
     setCreating(true); setCreateErr(null);
     try {
-      const dates = getRecurrenceDates(form);
       const basePayload = formToPayload(form);
+      const dates = getRecurrenceDates(form);
       for (const date of dates) {
-        const payload = { ...basePayload, deadline: (form.task_type === "due_by" || form.task_type === "set_time") ? date : null };
+        const needsDeadline = form.task_type === "due_by" || form.task_type === "set_time" || (form.task_type === "flexible" && form.recurrence !== "once");
+        const payload = { ...basePayload, deadline: needsDeadline ? date : null };
         const res = await fetch(`${API_BASE}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
         if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
         if (!res.ok) { setCreateErr(friendlyError(await res.text(), "Failed to create task.")); return; }
@@ -670,19 +702,28 @@ export default function Dashboard() {
     if (!t) return nav("/login", { replace: true });
     setEditing(true); setEditErr(null);
     try {
-      // Always update the original task
-      const res = await fetch(`${API_BASE}/tasks/${editTaskId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(formToPayload(editForm)) });
+      // Find the original task to check if recurrence is newly added
+      const originalTask = tasks.find(tk => tk.id === editTaskId);
+      const originalRecurrence = originalTask?.recurrence ?? "none";
+      const recurrenceMap: Record<string, string> = { "once": "none", "daily": "daily", "weekly": "weekly" };
+      const newRecurrence = recurrenceMap[editForm.recurrence] ?? editForm.recurrence;
+      const recurrenceNewlyAdded = originalRecurrence === "none" && newRecurrence !== "none";
+
+      // PUT updates all fields on the single task
+      const res = await fetch(`${API_BASE}/tasks/${editTaskId}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(formToPayload(editForm)) });
       if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
       if (!res.ok) { const msg = await res.text(); setEditErr(msg || "Failed to update task."); return; }
-      // If recurrence is set (not once), create additional copies from day 2 onward
-      if (editForm.recurrence && editForm.recurrence !== "once") {
-        const dates = getRecurrenceDates(editForm).slice(1); // skip first, already updated
+
+      // Only create copies if recurrence was just added for the first time
+      if (recurrenceNewlyAdded) {
+        const dates = getRecurrenceDates(editForm).slice(1); // skip first (already updated above)
         const basePayload = formToPayload(editForm);
         for (const date of dates) {
-          const payload = { ...basePayload, deadline: (editForm.task_type === "due_by" || editForm.task_type === "set_time") ? date : null };
+          const payload = { ...basePayload, deadline: (editForm.task_type === "due_by" || editForm.task_type === "set_time" || (editForm.task_type === "flexible" && editForm.recurrence !== "once")) ? date : null };
           await fetch(`${API_BASE}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
         }
       }
+
       setShowEditModal(false); await fetchTasks();
     } catch { setEditErr("Failed to update task. Is the backend running?"); }
     finally { setEditing(false); }
@@ -946,6 +987,14 @@ export default function Dashboard() {
             <div className="task-title" style={{ textDecoration: t.completed ? "line-through" : "none", opacity: t.completed ? 0.5 : 1 }}>{t.title}</div>
             <div className="task-meta">
               <PriorityBadge n={t.importance} />
+              {t.category && (() => {
+                const cat = CATEGORIES.find(c => c.value === t.category);
+                return (
+                  <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 600, background: cat ? `${cat.color}18` : "rgba(255,255,255,.07)", color: cat?.color ?? "var(--muted)", border: `1px solid ${cat ? cat.color + "40" : "var(--border)"}` }}>
+                    {t.category}
+                  </span>
+                );
+              })()}
               <span>•</span><span>{formatDuration(displayDuration)}</span>
               {t.task_type === "fixed" && t.fixed_start && <><span>•</span><span style={{ color: "var(--accent2)" }}>🕐 {t.fixed_start}{t.fixed_end ? `–${t.fixed_end}` : ""}</span></>}
               {t.deadline && <><span>•</span><span className="deadline-badge">📅 {t.deadline}</span></>}
@@ -1122,8 +1171,7 @@ export default function Dashboard() {
                     onClick={e => e.stopPropagation()}
                   >{t.title}</div>
                 ))}
-                {dt.length > 2 && <div className="cal-task-more">+{dt.length - 2} more</div>}
-              </div>
+                {dt.length > 2 && <div className="cal-task-more">+{dt.length - 2} more</div>}              </div>
             );
           })}
         </div>
@@ -1273,6 +1321,7 @@ export default function Dashboard() {
         <aside className="sidebar">
           <div className="side-title">Dashboard</div>
           <button className="side-pill" type="button">Taskboard</button>
+          <button className="side-link" type="button" onClick={() => nav("/analytics")}>Analytics</button>
           <button
             type="button"
             className="widget-show-btn widget-show-btn--sidebar"
@@ -1400,7 +1449,7 @@ export default function Dashboard() {
             )}
           </section>
 
-          <section className="panel calendar-panel">
+          <section className="panel calendar-panel" style={{ minHeight: 520 }}>
             <div className="cal-view-switcher">
               {(["month","week","agenda"] as CalView[]).map(v => (
                 <button key={v} className={`cal-view-btn${calView === v ? " cal-view-btn-active" : ""}`} onClick={() => setCalView(v)}>
