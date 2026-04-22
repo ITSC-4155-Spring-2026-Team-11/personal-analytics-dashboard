@@ -32,6 +32,14 @@ export default function Account() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Integrations
+  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null);
+  const [integrationsMsg, setIntegrationsMsg] = useState<string | null>(null);
+  const [integrationsErr, setIntegrationsErr] = useState<string | null>(null);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
   // Change password inline
   const [showChangePw, setShowChangePw] = useState(false);
   const [currentPw, setCurrentPw] = useState("");
@@ -42,6 +50,13 @@ export default function Account() {
   const [pwErr, setPwErr] = useState<string | null>(null);
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
+
+  // Schedule preferences state
+  const [wakeTime, setWakeTime] = useState("07:00");
+  const [sleepTime, setSleepTime] = useState("23:00");
+  const [schedSaving, setSchedSaving] = useState(false);
+  const [schedMsg, setSchedMsg] = useState<string | null>(null);
+  const [schedErr, setSchedErr] = useState<string | null>(null);
 
   // 2FA state
   const [totpEnabled, setTotpEnabled] = useState<boolean | null>(null);
@@ -76,6 +91,28 @@ export default function Account() {
     }
   }, [nav]);
 
+  const fetchIntegrations = useCallback(async () => {
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    setIntegrationsLoading(true);
+    setIntegrationsErr(null);
+    try {
+      const res = await fetch(`${API_BASE}/integrations`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const integrations = Array.isArray(data.integrations) ? data.integrations : [];
+        const google = integrations.find((x: any) => x?.provider === "google");
+        setGoogleConnected(!!google?.connected);
+      } else {
+        setGoogleConnected(false);
+      }
+    } catch {
+      setGoogleConnected(false);
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }, []);
+
   const fetch2FAStatus = useCallback(async () => {
     const token = sessionStorage.getItem("access_token");
     if (!token) return;
@@ -92,7 +129,35 @@ export default function Account() {
     }
   }, []);
 
-  useEffect(() => { if (session) fetch2FAStatus(); }, [session, fetch2FAStatus]);
+  useEffect(() => { if (session) { fetch2FAStatus(); fetchIntegrations(); } }, [session, fetch2FAStatus, fetchIntegrations]);
+
+  useEffect(() => {
+    if (!session) return;
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    fetch(`${API_BASE}/preferences`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setWakeTime(data.wake_time ?? "07:00");
+          setSleepTime(data.sleep_time ?? "23:00");
+        }
+      })
+      .catch(() => {});
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const url = new URL(window.location.href);
+    const google = url.searchParams.get("google");
+    if (google === "connected") {
+      setIntegrationsMsg("Google Calendar connected ✅");
+      window.setTimeout(() => setIntegrationsMsg(null), 2500);
+      void fetchIntegrations();
+      url.searchParams.delete("google");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [session, fetchIntegrations]);
 
   async function signOut() {
     const refreshToken = sessionStorage.getItem("refresh_token");
@@ -107,6 +172,65 @@ export default function Account() {
     }
     sessionStorage.clear(); localStorage.clear();
     nav("/login", { replace: true });
+  }
+
+  async function connectGoogle() {
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    setIntegrationsErr(null);
+    setIntegrationsMsg(null);
+    try {
+      const res = await fetch(`${API_BASE}/integrations/google/authorize`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { setIntegrationsErr(data?.detail || "Could not start Google connection."); return; }
+      const url = data?.authorization_url;
+      if (!url) { setIntegrationsErr("Server did not return an authorization URL."); return; }
+      window.location.assign(String(url));
+    } catch {
+      setIntegrationsErr("Could not connect to server.");
+    }
+  }
+
+  async function disconnectGoogle() {
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    setIntegrationsErr(null);
+    setIntegrationsMsg(null);
+    setIntegrationsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/integrations/google/disconnect`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setIntegrationsErr(data?.detail || "Disconnect failed."); return; }
+      setIntegrationsMsg("Google Calendar disconnected.");
+      setGoogleConnected(false);
+      setSyncResult(null);
+      window.setTimeout(() => setIntegrationsMsg(null), 2000);
+    } catch {
+      setIntegrationsErr("Could not connect to server.");
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }
+
+  async function syncGoogleNow() {
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    setSyncLoading(true);
+    setSyncResult(null);
+    setIntegrationsErr(null);
+    try {
+      const res = await fetch(`${API_BASE}/calendar/google/sync`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setIntegrationsErr((data as any)?.detail || "Sync failed."); return; }
+      const imported = (data as any)?.imported ?? 0;
+      const updated = (data as any)?.updated ?? 0;
+      const skipped = (data as any)?.skipped ?? 0;
+      setSyncResult(`Imported ${imported}, updated ${updated}, skipped ${skipped}.`);
+    } catch {
+      setIntegrationsErr("Could not connect to server.");
+    } finally {
+      setSyncLoading(false);
+    }
   }
 
   function saveProfile(e: React.FormEvent) {
@@ -160,6 +284,31 @@ export default function Account() {
       setPwErr("Could not connect to server.");
     } finally {
       setPwSaving(false);
+    }
+  }
+
+  async function saveSchedule(e: React.FormEvent) {
+    e.preventDefault();
+    setSchedErr(null); setSchedMsg(null);
+    if (wakeTime >= sleepTime) {
+      setSchedErr("Wake time must be earlier than sleep time.");
+      return;
+    }
+    setSchedSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/preferences`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ wake_time: wakeTime, sleep_time: sleepTime }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSchedErr(data.detail || "Could not save."); return; }
+      setSchedMsg("Schedule saved ✅");
+      setTimeout(() => setSchedMsg(null), 2200);
+    } catch {
+      setSchedErr("Could not connect to server.");
+    } finally {
+      setSchedSaving(false);
     }
   }
 
@@ -260,6 +409,7 @@ export default function Account() {
           <div className="side-title">Account</div>
           <button className="side-pill" type="button">Profile</button>
           <button className="side-link" type="button" onClick={() => setShowChangePw(v => !v)}>Change password</button>
+          <button className="side-link" type="button" onClick={() => document.getElementById("schedule-panel")?.scrollIntoView({ behavior: "smooth" })}>Schedule</button>
           <button className="side-link side-link-danger" type="button" onClick={signOut}>Sign out</button>
         </aside>
 
@@ -521,6 +671,92 @@ export default function Account() {
                   </div>
                 </>
               )}
+            </section>
+
+            <section className="panel" style={{ marginTop: 16 }}>
+              <div className="panel-head">
+                <div>
+                  <h2 className="panel-title" style={{ fontSize: "1.1rem" }}>Integrations</h2>
+                  <p className="panel-sub" style={{ marginTop: 4 }}>
+                    Connect a calendar to automatically import appointments.
+                  </p>
+                </div>
+              </div>
+
+              {integrationsErr && <div className="error" style={{ marginTop: 12 }}>{integrationsErr}</div>}
+              {integrationsMsg && <div className="success-notice" style={{ marginTop: 12 }}>{integrationsMsg}</div>}
+
+              <div className="list" style={{ marginTop: 12 }}>
+                <article className="task" style={{ alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="task-title">Google Calendar</div>
+                    <div className="task-meta" style={{ marginTop: 4 }}>
+                      {integrationsLoading || googleConnected === null ? "Loading…" : googleConnected ? "● Connected" : "○ Not connected"}
+                    </div>
+                    {syncResult && <div className="task-meta" style={{ marginTop: 6, color: "var(--accent2)" }}>{syncResult}</div>}
+                  </div>
+
+                  {!integrationsLoading && googleConnected === false && (
+                    <button className="primary-btn" type="button" onClick={() => void connectGoogle()}>
+                      Connect
+                    </button>
+                  )}
+                  {!integrationsLoading && googleConnected === true && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <button className="ghost-btn" type="button" onClick={() => void syncGoogleNow()} disabled={syncLoading}>
+                        {syncLoading ? "Syncing…" : "Sync now"}
+                      </button>
+                      <button className="danger-btn" type="button" onClick={() => void disconnectGoogle()}>
+                        Disconnect
+                      </button>
+                    </div>
+                  )}
+                </article>
+              </div>
+            </section>
+
+          <section className="panel" id="schedule-panel" style={{ marginTop: 16 }}>
+              <div className="panel-head">
+                <div>
+                  <h2 className="panel-title" style={{ fontSize: "1.1rem" }}>Schedule Window</h2>
+                  <p className="panel-sub" style={{ marginTop: 4 }}>
+                    The scheduler will only place tasks within these hours. Fixed-time tasks you add manually are exempt.
+                  </p>
+                </div>
+              </div>
+
+              {schedErr && <div className="error" style={{ marginTop: 12 }}>{schedErr}</div>}
+              {schedMsg && <div className="success-notice" style={{ marginTop: 12 }}>{schedMsg}</div>}
+
+              <form onSubmit={saveSchedule} style={{ marginTop: 16 }}>
+                <div className="modal-row">
+                  <div className="modal-field">
+                    <label>Wake time</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={wakeTime}
+                      onChange={e => setWakeTime(e.target.value)}
+                      disabled={schedSaving}
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Sleep time</label>
+                    <input
+                      className="input"
+                      type="time"
+                      value={sleepTime}
+                      onChange={e => setSleepTime(e.target.value)}
+                      disabled={schedSaving}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <button className="primary-btn" type="submit" disabled={schedSaving}>
+                    {schedSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </form>
             </section>
           </div>
         </div>

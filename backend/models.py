@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, Integer, Boolean, Float
+from sqlalchemy import ForeignKey, String, Integer, Boolean, Float, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from typing import Optional
@@ -149,6 +149,14 @@ class Task(Base):
     # ── Recurrence ────────────────────────────────────────────────────────────
     recurrence      : Mapped[str]           = mapped_column(String(10), default="none", nullable=False)
     recurrence_days : Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "0,2,4"
+
+    # ── Source / integrations ────────────────────────────────────────────────
+    # source:
+    #   "manual" (default) | "google_calendar" | ...
+    source            : Mapped[str]           = mapped_column(String(30), default="manual", nullable=False)
+    external_provider : Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # e.g. "google"
+    external_id       : Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # provider event id
+    imported_at       : Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # ── Outcome / ML training signal ──────────────────────────────────────────
     completed_at        : Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -301,3 +309,26 @@ class TaskFeedback(Base):
 
     owner : Mapped["User"] = relationship(back_populates="task_feedback_entries")
     task  : Mapped["Task"] = relationship(back_populates="feedback")
+
+
+class IntegrationCredential(Base):
+    """
+    Stores OAuth credentials for third-party integrations (currently calendar).
+    """
+
+    __tablename__ = "integration_credentials"
+
+    id       : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id  : Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    provider : Mapped[str] = mapped_column(String(30), nullable=False, index=True)  # "google"
+
+    access_token  : Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    token_type    : Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    scope         : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expires_at    : Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    created_at : Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at : Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship()

@@ -41,6 +41,30 @@ FROM_EMAIL    = os.environ.get("FROM_EMAIL",    "no-reply@yourapp.com")
 
 APP_BASE_URL  = os.environ.get("APP_BASE_URL",  "http://localhost:8000")
 
+# ── Integrations (OAuth) ──────────────────────────────────────────────────────
+# Used for calendar integrations (e.g., Google Calendar).
+# In dev, you can set FRONTEND_BASE_URL=http://localhost:5173 to redirect back to Vite.
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+
+# Google Calendar OAuth (required to connect Google Calendar)
+GOOGLE_OAUTH_CLIENT_ID     = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+# Must match the redirect URI configured in Google Cloud Console.
+# If unset, defaults to the backend URL's /integrations/google/callback.
+GOOGLE_OAUTH_REDIRECT_URI  = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
+
+# ── Email sending ─────────────────────────────────────────────────────────────
+# Set DISABLE_SMTP_SENDING=1 to skip email entirely (accounts auto-verify).
+# Useful when SMTP is unavailable (e.g. Render free tier blocks port 587).
+_smtp_configured = bool(SMTP_USER and SMTP_PASSWORD)
+_disable_env = os.environ.get("DISABLE_SMTP_SENDING", "").strip().lower()
+if _disable_env in ("1", "true", "yes"):
+    DISABLE_SMTP_SENDING = True
+elif _disable_env in ("0", "false", "no"):
+    DISABLE_SMTP_SENDING = False
+else:
+    DISABLE_SMTP_SENDING = not _smtp_configured
+
 # ── Password rules ────────────────────────────────────────────────────────────
 MIN_PASSWORD_LENGTH = 8
 

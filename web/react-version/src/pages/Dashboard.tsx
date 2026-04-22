@@ -24,6 +24,8 @@ type Task = {
   preferred_time: string | null;
   recurrence: string | null;
   recurrence_days: string | null;
+  source?: string | null;
+  external_provider?: string | null;
 };
 
 function importanceLabel(n: number) {
@@ -880,7 +882,17 @@ export default function Dashboard() {
   const noDeadlineTasks = dedupeForList(filteredTasks.filter(t => !t.deadline && !t.completed));
   const completedTasks = dedupeForList(filteredTasks.filter(t => t.completed));
 
-  function tasksForDate(ds: string) { return tasks.filter(t => t.deadline === ds); }
+  function tasksForDate(ds: string, scheduleData?: ScheduleData | null) {
+    const byDeadline = tasks.filter(t => t.deadline === ds);
+    if (!scheduleData) return byDeadline;
+    const scheduledIds = new Set(scheduleData.scheduled.map(s => s.task_id));
+    const scheduledFlexible = tasks.filter(t => !t.deadline && !t.completed && scheduledIds.has(t.id));
+    const merged = [...byDeadline];
+    for (const t of scheduledFlexible) {
+      if (!merged.find((x: Task) => x.id === t.id)) merged.push(t);
+    }
+    return merged;
+  }
 
   function prevMonth() { if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); } else setCalMonth(m => m - 1); }
   function nextMonth() { if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); } else setCalMonth(m => m + 1); }
@@ -893,9 +905,11 @@ export default function Dashboard() {
   const agendaDays: { date: Date; dateStr: string; tasks: Task[] }[] = [];
   for (let i = 0; i < 60; i++) {
     const d = addDays(today, i); const ds = toDateStr(d);
-    const dt = tasks.filter(t => t.deadline === ds).sort((a, b) => b.importance - a.importance);
+    const schedData = ds === todayStr ? schedule : null;
+    const dt = tasksForDate(ds, schedData).filter(t => !t.completed).sort((a, b) => b.importance - a.importance);
     if (dt.length > 0) agendaDays.push({ date: d, dateStr: ds, tasks: dt });
   }
+
   const overdueAgenda = tasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
 
   const daysInMonth = getDaysInMonth(calYear, calMonth);
@@ -915,6 +929,7 @@ export default function Dashboard() {
   }
 
   function TaskCard({ t }: { t: Task }) {
+    const imported = t.source && t.source !== "manual";
     const displayDuration = (() => {
       if (t.task_type === "fixed" && t.fixed_start && t.fixed_end) {
         const computed = calcDuration(t.fixed_start, t.fixed_end);
@@ -934,6 +949,12 @@ export default function Dashboard() {
             <div className="task-title" style={{ textDecoration: t.completed ? "line-through" : "none", opacity: t.completed ? 0.5 : 1 }}>{t.title}</div>
             <div className="task-meta">
               <PriorityBadge n={t.importance} />
+              {imported && (
+                <>
+                  <span>•</span>
+                  <span style={{ fontWeight: 700, color: "var(--accent2)" }}>Imported</span>
+                </>
+              )}
               <span>•</span><span>{formatDuration(displayDuration)}</span>
               {t.task_type === "fixed" && t.fixed_start && <><span>•</span><span style={{ color: "var(--accent2)" }}>🕐 {t.fixed_start}{t.fixed_end ? `–${t.fixed_end}` : ""}</span></>}
               {t.deadline && <><span>•</span><span className="deadline-badge">📅 {t.deadline}</span></>}
@@ -941,7 +962,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {!t.completed && <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openEditModal(t)}>Edit</button>}
+          {!t.completed && !imported && <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openEditModal(t)}>Edit</button>}
           <button className="danger-btn" onClick={() => handleDeleteClick(t)}>Delete</button>
         </div>
       </article>
@@ -950,7 +971,7 @@ export default function Dashboard() {
 
   function DayPopup() {
     if (!dayPopup) return null;
-    const dayTasks = tasksForDate(dayPopup);
+    const dayTasks = tasksForDate(dayPopup, dayPopupSchedule);
 
     const PX_PER_MIN = 1.2;
     const HOUR_HEIGHT = 60 * PX_PER_MIN;
