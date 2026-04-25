@@ -929,10 +929,6 @@ export default function Dashboard() {
   const completedTasks = dedupeForList(filteredTasks.filter(t => t.completed));
 
   function tasksForDate(ds: string, scheduleData?: ScheduleData | null) {
-    const byDeadline = tasks.filter(t => t.deadline === ds);
-    if (!scheduleData) return byDeadline;
-    const scheduledIds = new Set(scheduleData.scheduled.map(s => s.task_id));
-    const scheduledFlexible = tasks.filter(t => !t.deadline && !t.completed && scheduledIds.has(t.id));
     const byDeadline = filteredTasks.filter(t => t.deadline === ds);
     if (!scheduleData) return byDeadline;
     const scheduledIds = new Set(scheduleData.scheduled.map(s => s.task_id));
@@ -960,7 +956,6 @@ export default function Dashboard() {
     if (dt.length > 0) agendaDays.push({ date: d, dateStr: ds, tasks: dt });
   }
 
-  const overdueAgenda = tasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
   const overdueAgenda = filteredTasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
 
   const daysInMonth = getDaysInMonth(calYear, calMonth);

@@ -43,6 +43,7 @@ ALTER TABLE users ADD COLUMN email_2fa_enabled BOOLEAN NOT NULL DEFAULT 0;
 1. **Create a MySQL database** (e.g. `plannerhub`).
 
 2. **Optional: run the reference schema** (SQLAlchemy can also create tables on first run):
+
    ```bash
    mysql -u user -p plannerhub < database/schema_mysql.sql
    ```
@@ -50,18 +51,22 @@ ALTER TABLE users ADD COLUMN email_2fa_enabled BOOLEAN NOT NULL DEFAULT 0;
 3. **Set `DATABASE_URL`** and start the app:
 
    **Windows PowerShell:**
+
    ```powershell
    $env:DATABASE_URL = "mysql+pymysql://USER:PASSWORD@localhost:3306/plannerhub"
    uvicorn backend.app:app --reload
    ```
 
    **Or use a `.env` file** (create in project root; add `.env` to `.gitignore` if needed):
+
    ```
    DATABASE_URL=mysql+pymysql://USER:PASSWORD@localhost:3306/plannerhub
    ```
+
    Then load it before running (e.g. `pip install python-dotenv` and in `backend/config.py` add `load_dotenv()` and use `os.environ.get("DATABASE_URL", ...)` — or set the variable in your shell).
 
 4. **Run the backend** from the project root:
+
    ```bash
    uvicorn backend.app:app --reload
    ```
