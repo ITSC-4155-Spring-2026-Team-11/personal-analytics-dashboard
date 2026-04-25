@@ -36,6 +36,7 @@ VALID_TASK_TYPES    = ("fixed", "semi", "flexible")
 VALID_ENERGY_LEVELS = ("high", "medium", "low")
 VALID_PREF_TIMES    = ("morning", "afternoon", "evening", "none")
 VALID_RECURRENCE    = ("none", "daily", "weekly")
+VALID_CATEGORIES    = ("Work", "Study", "Exercise", "Rest")
 
 
 # ── Request schemas ───────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ class TaskCreate(BaseModel):
     duration_minutes : Optional[int] = 30
     importance       : Optional[int] = 3
     deadline         : Optional[str] = None   # YYYY-MM-DD
+    category         : Optional[str] = "Work"  # "Work"|"Study"|"Exercise"|"Rest"
 
     # ── Task type ─────────────────────────────────────────────────────────────
     # "fixed"    = set time (appointment, work, class)
@@ -95,6 +97,13 @@ class TaskCreate(BaseModel):
             raise ValueError(f"recurrence must be one of: {VALID_RECURRENCE}")
         return v
 
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v):
+        if v is not None and v not in VALID_CATEGORIES:
+            raise ValueError(f"category must be one of: {VALID_CATEGORIES}")
+        return v
+
     @field_validator("importance")
     @classmethod
     def validate_importance(cls, v):
@@ -123,6 +132,7 @@ class TaskUpdate(BaseModel):
     duration_minutes      : Optional[int]  = None
     importance            : Optional[int]  = None
     deadline              : Optional[str]  = None
+    category              : Optional[str]  = None
     task_type             : Optional[str]  = None
     fixed_start           : Optional[str]  = None
     fixed_end             : Optional[str]  = None
@@ -161,6 +171,7 @@ def serialize_task(task: Task) -> dict:
         "id"                   : task.id,
         "title"                : task.title,
         "task_type"            : task.task_type,
+        "category"             : task.category,
         "duration_minutes"     : task.duration_minutes,
         "deadline"             : task.deadline,
         "importance"           : task.importance,
@@ -260,6 +271,7 @@ def create_task(
     task = Task(
         user_id               = current_user.id,
         title                 = body.title.strip(),
+        category              = body.category or "Work",
         task_type             = body.task_type or "flexible",
         duration_minutes      = body.duration_minutes or 30,
         deadline              = body.deadline,
@@ -301,6 +313,8 @@ def update_task(
         if not body.title.strip():
             raise HTTPException(status_code=422, detail="Task title cannot be empty")
         task.title = body.title.strip()
+    if body.category is not None:
+        task.category = body.category
     if body.duration_minutes is not None:
         task.duration_minutes = body.duration_minutes
     if body.deadline is not None:

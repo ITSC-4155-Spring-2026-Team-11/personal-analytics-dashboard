@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TasksAtAGlanceWidget from "../components/TasksAtAGlanceWidget.tsx";
-import { emitTasksUpdatedIfTauri, syncTauriWidgetToken } from "../tauriWidgetBridge.ts";
+import { emitTasksUpdatedIfTauri, isTauriRuntime, syncTauriWidgetToken } from "../tauriWidgetBridge.ts";
 import { showWidgetRobust } from "../widgetInvoke.ts";
 import { API_BASE } from "../apiBase.ts";
 
@@ -11,6 +11,7 @@ type Session = { email?: string; loginTime?: string; name?: string };
 type Task = {
   id: number;
   title: string;
+  category: string;
   duration_minutes: number;
   deadline: string | null;
   importance: number;
@@ -167,6 +168,13 @@ const RECURRENCE_OPTIONS = [
 
 const WEEKDAY_LABELS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+const CATEGORIES = [
+  { value: "Work",     color: "#6c63ff" },
+  { value: "Study",    color: "#74c0fc" },
+  { value: "Exercise", color: "#69db7c" },
+  { value: "Rest",     color: "#ffd43b" },
+];
+
 function blankForm(prefillDate?: string, prefillHour?: number) {
   return {
     title: "",
@@ -181,6 +189,7 @@ function blankForm(prefillDate?: string, prefillHour?: number) {
     preferred_time: "none",
     recurrence: "once",
     recurrence_days: [] as number[],
+    category: "Work",
   };
 }
 
@@ -231,6 +240,22 @@ function TaskFormFields({ f, setF, err: formErr, showOpt, setShowOpt, showRec, s
       <div className="modal-field">
         <label>Task name</label>
         <input className="input" placeholder="What needs to be done?" value={f.title} onChange={e => upd({ title: e.target.value })} maxLength={120} autoFocus />
+      </div>
+      <div className="modal-field">
+        <label>Category</label>
+        <div className="pill-group pill-group-row">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.value}
+              type="button"
+              className={`pill-btn-sm ${f.category === cat.value ? "pill-btn-sm-active" : ""}`}
+              style={f.category === cat.value ? { borderColor: cat.color, color: cat.color, background: `${cat.color}18` } : {}}
+              onClick={() => upd({ category: cat.value })}
+            >
+              {cat.value}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="modal-field">
         <label>Task type <span style={{ color: "var(--error)" }}>*</span></label>
@@ -381,6 +406,8 @@ export default function Dashboard() {
   const [email2FAEnabled, setEmail2FAEnabled] = useState<boolean | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [showTaskGlance, setShowTaskGlance] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState({ tasks: false, schedule: false, calendar: false });
+  const [groupCollapsed, setGroupCollapsed] = useState({ overdue: false, upcoming: false, nodeadline: false, completed: true });
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState<TaskForm>(blankForm());
@@ -433,6 +460,7 @@ export default function Dashboard() {
   const [showEditOptional, setShowEditOptional] = useState(false);
   const [showEditRecurrence, setShowEditRecurrence] = useState(false);
   const editModalRef = useRef<HTMLDivElement>(null);
+  const [editReturnToDay, setEditReturnToDay] = useState<string | null>(null);
 
   const [priorityFilter, setPriorityFilter] = useState<number>(0);
   const [dragTaskId, setDragTaskId] = useState<number | null>(null);
@@ -511,7 +539,7 @@ export default function Dashboard() {
   }
 
   useModalDismiss(showAddModal, modalRef, () => setShowAddModal(false));
-  useModalDismiss(showEditModal, editModalRef, () => setShowEditModal(false));
+  useModalDismiss(showEditModal, editModalRef, () => { setShowEditModal(false); if (editReturnToDay) { setDayPopup(editReturnToDay); setEditReturnToDay(null); } });
   useModalDismiss(!!dayPopup, dayPopupRef, () => setDayPopup(null));
 
   useEffect(() => {
@@ -541,6 +569,7 @@ export default function Dashboard() {
       fixed_start: t.fixed_start ?? "", fixed_end: t.fixed_end ?? "",
       location: t.location ?? "", deadline: t.deadline ?? "",
       duration_minutes: t.duration_minutes, importance: t.importance,
+      category: t.category ?? "Work",
       energy_level: reverseEnergyMap[t.energy_level ?? "medium"] ?? t.energy_level ?? "moderate",
       preferred_time: t.preferred_time ?? "none",
       recurrence: reverseRecurMap[t.recurrence ?? "none"] ?? t.recurrence ?? "once",
@@ -558,8 +587,13 @@ export default function Dashboard() {
     return {
       title: f.title.trim(),
       duration_minutes: f.duration_minutes || 30,
-      deadline: (f.task_type === "due_by" || f.task_type === "set_time") ? (f.deadline || null) : null,
+      deadline: (f.task_type === "due_by" || f.task_type === "set_time")
+        ? (f.deadline || null)
+        : (f.task_type === "flexible" && f.recurrence && f.recurrence !== "once")
+          ? (f.deadline || toDateStr(today))
+          : null,
       importance: f.importance,
+      category: f.category,
       task_type:    taskTypeMap[f.task_type]    ?? f.task_type,
       fixed_start: f.task_type === "set_time" ? (f.fixed_start || null) : null,
       fixed_end: (f.task_type === "set_time" || f.task_type === "due_by") ? (f.fixed_end || null) : null,
@@ -644,10 +678,11 @@ export default function Dashboard() {
     if (!t) return nav("/login", { replace: true });
     setCreating(true); setCreateErr(null);
     try {
-      const dates = getRecurrenceDates(form);
       const basePayload = formToPayload(form);
+      const dates = getRecurrenceDates(form);
       for (const date of dates) {
-        const payload = { ...basePayload, deadline: (form.task_type === "due_by" || form.task_type === "set_time") ? date : null };
+        const needsDeadline = form.task_type === "due_by" || form.task_type === "set_time" || (form.task_type === "flexible" && form.recurrence !== "once");
+        const payload = { ...basePayload, deadline: needsDeadline ? date : null };
         const res = await fetch(`${API_BASE}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
         if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
         if (!res.ok) { setCreateErr(friendlyError(await res.text(), "Failed to create task.")); return; }
@@ -672,20 +707,31 @@ export default function Dashboard() {
     if (!t) return nav("/login", { replace: true });
     setEditing(true); setEditErr(null);
     try {
-      // Always update the original task
-      const res = await fetch(`${API_BASE}/tasks/${editTaskId}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(formToPayload(editForm)) });
+      // Find the original task to check if recurrence is newly added
+      const originalTask = tasks.find(tk => tk.id === editTaskId);
+      const originalRecurrence = originalTask?.recurrence ?? "none";
+      const recurrenceMap: Record<string, string> = { "once": "none", "daily": "daily", "weekly": "weekly" };
+      const newRecurrence = recurrenceMap[editForm.recurrence] ?? editForm.recurrence;
+      const recurrenceNewlyAdded = originalRecurrence === "none" && newRecurrence !== "none";
+
+      // PUT updates all fields on the single task
+      const res = await fetch(`${API_BASE}/tasks/${editTaskId}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(formToPayload(editForm)) });
       if (res.status === 401) { sessionStorage.clear(); nav("/login", { replace: true }); return; }
       if (!res.ok) { const msg = await res.text(); setEditErr(msg || "Failed to update task."); return; }
-      // If recurrence is set (not once), create additional copies from day 2 onward
-      if (editForm.recurrence && editForm.recurrence !== "once") {
-        const dates = getRecurrenceDates(editForm).slice(1); // skip first, already updated
+
+      // Only create copies if recurrence was just added for the first time
+      if (recurrenceNewlyAdded) {
+        const dates = getRecurrenceDates(editForm).slice(1); // skip first (already updated above)
         const basePayload = formToPayload(editForm);
         for (const date of dates) {
-          const payload = { ...basePayload, deadline: (editForm.task_type === "due_by" || editForm.task_type === "set_time") ? date : null };
+          const payload = { ...basePayload, deadline: (editForm.task_type === "due_by" || editForm.task_type === "set_time" || (editForm.task_type === "flexible" && editForm.recurrence !== "once")) ? date : null };
           await fetch(`${API_BASE}/tasks/`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify(payload) });
         }
       }
-      setShowEditModal(false); await fetchTasks();
+
+      setShowEditModal(false);
+      if (editReturnToDay) { setDayPopup(editReturnToDay); setEditReturnToDay(null); }
+      await fetchTasks();
     } catch { setEditErr("Failed to update task. Is the backend running?"); }
     finally { setEditing(false); }
   }
@@ -887,6 +933,10 @@ export default function Dashboard() {
     if (!scheduleData) return byDeadline;
     const scheduledIds = new Set(scheduleData.scheduled.map(s => s.task_id));
     const scheduledFlexible = tasks.filter(t => !t.deadline && !t.completed && scheduledIds.has(t.id));
+    const byDeadline = filteredTasks.filter(t => t.deadline === ds);
+    if (!scheduleData) return byDeadline;
+    const scheduledIds = new Set(scheduleData.scheduled.map(s => s.task_id));
+    const scheduledFlexible = filteredTasks.filter(t => !t.completed && scheduledIds.has(t.id));
     const merged = [...byDeadline];
     for (const t of scheduledFlexible) {
       if (!merged.find((x: Task) => x.id === t.id)) merged.push(t);
@@ -911,6 +961,7 @@ export default function Dashboard() {
   }
 
   const overdueAgenda = tasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
+  const overdueAgenda = filteredTasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
 
   const daysInMonth = getDaysInMonth(calYear, calMonth);
   const firstDay = getFirstDayOfMonth(calYear, calMonth);
@@ -955,6 +1006,14 @@ export default function Dashboard() {
                   <span style={{ fontWeight: 700, color: "var(--accent2)" }}>Imported</span>
                 </>
               )}
+              {t.category && (() => {
+                const cat = CATEGORIES.find(c => c.value === t.category);
+                return (
+                  <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 600, background: cat ? `${cat.color}18` : "rgba(255,255,255,.07)", color: cat?.color ?? "var(--muted)", border: `1px solid ${cat ? cat.color + "40" : "var(--border)"}` }}>
+                    {t.category}
+                  </span>
+                );
+              })()}
               <span>•</span><span>{formatDuration(displayDuration)}</span>
               {t.task_type === "fixed" && t.fixed_start && <><span>•</span><span style={{ color: "var(--accent2)" }}>🕐 {t.fixed_start}{t.fixed_end ? `–${t.fixed_end}` : ""}</span></>}
               {t.deadline && <><span>•</span><span className="deadline-badge">📅 {t.deadline}</span></>}
@@ -1053,7 +1112,9 @@ export default function Dashboard() {
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>No specific time</div>
               {allDayTasksList.map(t => (
-                <div key={t.id} className="day-allday-chip" style={{ borderLeftColor: importanceDot(t.importance) }}>
+                <div key={t.id} className="day-allday-chip" style={{ borderLeftColor: importanceDot(t.importance), cursor: "pointer" }}
+                  onClick={e => { e.stopPropagation(); setEditReturnToDay(dayPopup); openEditModal(t); setDayPopup(null); }}
+                >
                   <span style={{ fontWeight: 600, fontSize: "0.84rem" }}>{t.title}</span>
                   <span style={{ fontSize: "0.74rem", color: "var(--muted)", marginLeft: 10 }}>{importanceLabel(t.importance)} · {formatDuration(t.duration_minutes)}</span>
                 </div>
@@ -1083,7 +1144,7 @@ export default function Dashboard() {
                 return (
                   <div key={t.id}
                     style={{ position: "absolute", top: topPx, left: leftOffset, width: colWidth, height: heightPx, background: c.bg, borderLeft: `3px solid ${importanceDot(t.importance)}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer", overflow: "hidden", boxSizing: "border-box", zIndex: 2, border: `1px solid ${c.border}`, borderLeftWidth: 3 }}
-                    onClick={e => { e.stopPropagation(); openEditModal(t); setDayPopup(null); }}
+                    onClick={e => { e.stopPropagation(); setEditReturnToDay(dayPopup); openEditModal(t); setDayPopup(null); }}
                   >
                     <div style={{ fontWeight: 700, fontSize: "0.8rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
                     {heightPx > 30 && <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: 2 }}>{t.timeLabel}</div>}
@@ -1114,7 +1175,7 @@ export default function Dashboard() {
           {calDays.map((day, i) => {
             if (!day) return <div key={`e-${i}`} className="cal-day cal-day-empty" />;
             const ds = calDateStr(calYear, calMonth, day);
-            const dt = tasksForDate(ds);
+            const dt = tasksForDate(ds, ds === todayStr ? schedule : null);
             const isToday = ds === todayStr;
             const isOverdue = ds < todayStr && dt.some(t => !t.completed);
             return (
@@ -1131,8 +1192,7 @@ export default function Dashboard() {
                     onClick={e => e.stopPropagation()}
                   >{t.title}</div>
                 ))}
-                {dt.length > 2 && <div className="cal-task-more">+{dt.length - 2} more</div>}
-              </div>
+                {dt.length > 2 && <div className="cal-task-more">+{dt.length - 2} more</div>}              </div>
             );
           })}
         </div>
@@ -1152,7 +1212,7 @@ export default function Dashboard() {
         <div className="week-grid">
           {weekDays.map((d, i) => {
             const ds = toDateStr(d);
-            const dt = tasksForDate(ds);
+            const dt = tasksForDate(ds, ds === todayStr ? schedule : null);
             const isToday = ds === todayStr;
             const isOverdue = ds < todayStr && dt.some(t => !t.completed);
             return (
@@ -1242,14 +1302,16 @@ export default function Dashboard() {
               Live reload
             </span>
           )}
-          <button
-            type="button"
-            className="widget-show-btn widget-show-btn--hero"
-            onClick={() => void openFloatingWidget()}
-            title="Opens the small floating task window (also: system tray → Show Widget)"
-          >
-            Show widget
-          </button>
+          {isTauriRuntime() && (
+            <button
+              type="button"
+              className="widget-show-btn widget-show-btn--hero"
+              onClick={() => void openFloatingWidget()}
+              title="Opens the small floating task window (also: system tray → Show Widget)"
+            >
+              Show widget
+            </button>
+          )}
           <button
             type="button"
             className="glance-btn"
@@ -1282,14 +1344,17 @@ export default function Dashboard() {
         <aside className="sidebar">
           <div className="side-title">Dashboard</div>
           <button className="side-pill" type="button">Taskboard</button>
-          <button
-            type="button"
-            className="widget-show-btn widget-show-btn--sidebar"
-            onClick={() => void openFloatingWidget()}
-            title="Opens the floating task window"
-          >
-            Show widget
-          </button>
+          <button className="side-link" type="button" onClick={() => nav("/analytics")}>Analytics</button>
+          {isTauriRuntime() && (
+            <button
+              type="button"
+              className="widget-show-btn widget-show-btn--sidebar"
+              onClick={() => void openFloatingWidget()}
+              title="Opens the floating task window"
+            >
+              Show widget
+            </button>
+          )}
           <button className="side-link" type="button" onClick={() => nav("/account")}>Account settings</button>
           <button className="side-link side-link-danger" type="button" onClick={signOut}>Sign out</button>
         </aside>
@@ -1297,129 +1362,183 @@ export default function Dashboard() {
         <div className="dash-content">
           <section className="panel">
             <div className="panel-head">
-              <div>
-                <h1 className="panel-title">My Tasks</h1>
+              <div style={{ cursor: "pointer", userSelect: "none" }} onClick={() => setPanelCollapsed(p => ({ ...p, tasks: !p.tasks }))}>
+                <h1 className="panel-title">
+                  My Tasks
+                  <button className="panel-collapse-btn" tabIndex={-1} aria-label={panelCollapsed.tasks ? "Expand" : "Collapse"}>{panelCollapsed.tasks ? "▸" : "▾"}</button>
+                </h1>
                 <p className="panel-sub">{dedupeForList(tasks).length} task{dedupeForList(tasks).length !== 1 ? "s" : ""} total</p>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <button
-                  type="button"
-                  className="widget-show-btn widget-show-btn--panel"
-                  onClick={() => void openFloatingWidget()}
-                  title="Floating task window"
-                >
-                  Show widget
-                </button>
+                {isTauriRuntime() && (
+                  <button
+                    type="button"
+                    className="widget-show-btn widget-show-btn--panel"
+                    onClick={() => void openFloatingWidget()}
+                    title="Floating task window"
+                  >
+                    Show widget
+                  </button>
+                )}
                 <button className="ghost-btn" type="button" onClick={fetchTasks}>↻ Refresh</button>
                 <button className="primary-btn" type="button" onClick={() => openAddModal()}>+ Add Task</button>
               </div>
             </div>
-            <div className="priority-filter-bar">
-              {PRIORITY_FILTERS.map(f => {
-                const active = priorityFilter === f.value;
-                const c = f.value === 0 ? null : importanceColor(f.value);
-                return (
-                  <button key={f.value} className={`priority-filter-btn${active ? " priority-filter-btn-active" : ""}`}
-                    style={active && c ? { background: c.bg, color: c.color, borderColor: c.border } : active ? { background: "rgba(108,99,255,.15)", color: "#6c63ff", borderColor: "rgba(108,99,255,.4)" } : {}}
-                    onClick={() => setPriorityFilter(f.value)}
-                  >
-                    {f.value !== 0 && <span style={{ width: 6, height: 6, borderRadius: "50%", background: active && c ? c.color : "var(--muted)", display: "inline-block", flexShrink: 0 }} />}
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
-            {err && <div className="error">{err}</div>}
-            <div className="list">
-              {loading ? <div className="empty">Loading tasks…</div>
-                : filteredTasks.length === 0 ? (
-                  <div className="empty">
-                    <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
-                    {priorityFilter !== 0 ? `No ${importanceLabel(priorityFilter).toLowerCase()} priority tasks.` : <>No tasks yet. Click <strong>+ Add Task</strong> to get started.</>}
-                  </div>
-                ) : (
-                  <>
-                    {overdueTasks.length > 0 && (<><div className="task-group-label" style={{ color: "#ff6b6b" }}>⚠ Overdue</div>{overdueTasks.map(t => <TaskCard key={t.id} t={t} />)}</>)}
-                    {upcomingTasks.length > 0 && (<><div className="task-group-label" style={{ marginTop: overdueTasks.length > 0 ? 16 : 0 }}>Upcoming deadlines</div>{upcomingTasks.map(t => <TaskCard key={t.id} t={t} />)}</>)}
-                    {noDeadlineTasks.length > 0 && (<><div className="task-group-label" style={{ marginTop: (overdueTasks.length > 0 || upcomingTasks.length > 0) ? 16 : 0 }}>No deadline</div>{noDeadlineTasks.map(t => <TaskCard key={t.id} t={t} />)}</>)}
-                    {completedTasks.length > 0 && (<><div className="task-group-label" style={{ marginTop: 16, color: "#69db7c" }}>✓ Completed</div>{completedTasks.map(t => <TaskCard key={t.id} t={t} />)}</>)}
-                  </>
-                )}
-            </div>
+            {!panelCollapsed.tasks && (
+              <>
+                <div className="priority-filter-bar">
+                  {PRIORITY_FILTERS.map(f => {
+                    const active = priorityFilter === f.value;
+                    const c = f.value === 0 ? null : importanceColor(f.value);
+                    return (
+                      <button key={f.value} className={`priority-filter-btn${active ? " priority-filter-btn-active" : ""}`}
+                        style={active && c ? { background: c.bg, color: c.color, borderColor: c.border } : active ? { background: "rgba(108,99,255,.15)", color: "#6c63ff", borderColor: "rgba(108,99,255,.4)" } : {}}
+                        onClick={() => setPriorityFilter(f.value)}
+                      >
+                        {f.value !== 0 && <span style={{ width: 6, height: 6, borderRadius: "50%", background: active && c ? c.color : "var(--muted)", display: "inline-block", flexShrink: 0 }} />}
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {err && <div className="error">{err}</div>}
+                <div className="list">
+                  {loading ? <div className="empty">Loading tasks…</div>
+                    : filteredTasks.length === 0 ? (
+                      <div className="empty">
+                        <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
+                        {priorityFilter !== 0 ? `No ${importanceLabel(priorityFilter).toLowerCase()} priority tasks.` : <>No tasks yet. Click <strong>+ Add Task</strong> to get started.</>}
+                      </div>
+                    ) : (
+                      <>
+                        {overdueTasks.length > 0 && (
+                          <>
+                            <button className="task-group-toggle" style={{ color: "#ff6b6b" }} onClick={() => setGroupCollapsed(g => ({ ...g, overdue: !g.overdue }))}>
+                              ⚠ Overdue ({overdueTasks.length})<span className="group-chevron">{groupCollapsed.overdue ? "▸" : "▾"}</span>
+                            </button>
+                            {!groupCollapsed.overdue && overdueTasks.map(t => <TaskCard key={t.id} t={t} />)}
+                          </>
+                        )}
+                        {upcomingTasks.length > 0 && (
+                          <>
+                            <button className="task-group-toggle" style={{ marginTop: overdueTasks.length > 0 ? 8 : 0 }} onClick={() => setGroupCollapsed(g => ({ ...g, upcoming: !g.upcoming }))}>
+                              Upcoming deadlines ({upcomingTasks.length})<span className="group-chevron">{groupCollapsed.upcoming ? "▸" : "▾"}</span>
+                            </button>
+                            {!groupCollapsed.upcoming && upcomingTasks.map(t => <TaskCard key={t.id} t={t} />)}
+                          </>
+                        )}
+                        {noDeadlineTasks.length > 0 && (
+                          <>
+                            <button className="task-group-toggle" style={{ marginTop: (overdueTasks.length > 0 || upcomingTasks.length > 0) ? 8 : 0 }} onClick={() => setGroupCollapsed(g => ({ ...g, nodeadline: !g.nodeadline }))}>
+                              No deadline ({noDeadlineTasks.length})<span className="group-chevron">{groupCollapsed.nodeadline ? "▸" : "▾"}</span>
+                            </button>
+                            {!groupCollapsed.nodeadline && noDeadlineTasks.map(t => <TaskCard key={t.id} t={t} />)}
+                          </>
+                        )}
+                        {completedTasks.length > 0 && (
+                          <>
+                            <button className="task-group-toggle" style={{ marginTop: 8, color: "#69db7c" }} onClick={() => setGroupCollapsed(g => ({ ...g, completed: !g.completed }))}>
+                              ✓ Completed ({completedTasks.length})<span className="group-chevron">{groupCollapsed.completed ? "▸" : "▾"}</span>
+                            </button>
+                            {!groupCollapsed.completed && completedTasks.map(t => <TaskCard key={t.id} t={t} />)}
+                          </>
+                        )}
+                      </>
+                    )}
+                </div>
+              </>
+            )}
           </section>
 
           <section className="panel schedule-panel">
             <div className="panel-head">
-              <div>
-                <h1 className="panel-title">Today's Schedule</h1>
+              <div style={{ cursor: "pointer", userSelect: "none" }} onClick={() => setPanelCollapsed(p => ({ ...p, schedule: !p.schedule }))}>
+                <h1 className="panel-title">
+                  Today's Schedule
+                  <button className="panel-collapse-btn" tabIndex={-1} aria-label={panelCollapsed.schedule ? "Expand" : "Collapse"}>{panelCollapsed.schedule ? "▸" : "▾"}</button>
+                </h1>
                 <p className="panel-sub">
                   {schedule ? `${schedule.summary.scheduled_count} tasks · ${schedule.summary.total_hours}h planned` : "ML-optimized for your day"}
                 </p>
               </div>
               <button className="ghost-btn" type="button" onClick={fetchSchedule} style={{ fontSize: "0.82rem" }}>↻ Refresh</button>
             </div>
-            {scheduleLoading ? (
-              <div className="empty" style={{ padding: "24px 0" }}>Building your schedule…</div>
-            ) : !schedule ? (
-              <div className="empty" style={{ padding: "24px 0" }}>
-                <div style={{ fontSize: "1.5rem", marginBottom: 8 }}>📅</div>
-                Could not load schedule. Make sure the backend is running.
-              </div>
-            ) : schedule.scheduled.length === 0 && schedule.overflow.length === 0 ? (
-              <div className="empty" style={{ padding: "24px 0" }}>
-                <div style={{ fontSize: "1.5rem", marginBottom: 8 }}>✅</div>
-                No tasks to schedule today. Add some tasks to get started.
-              </div>
-            ) : (
-              <div className="schedule-list">
-                {schedule.scheduled.map((item) => {
-                  const energyIcon = item.energy_level === "high" ? "🔥" : item.energy_level === "medium" ? "⚡" : "🌿";
-                  const todColor = item.time_of_day === "morning" ? "#ffd43b" : item.time_of_day === "afternoon" ? "#74c0fc" : "#b197fc";
-                  return (
-                    <div key={item.task_id} className="schedule-item">
-                      <div className="schedule-time-col">
-                        <span className="schedule-start">{item.start_time}</span>
-                        <span className="schedule-end">{item.end_time}</span>
-                      </div>
-                      <div className="schedule-bar" style={{ background: todColor }} />
-                      <div className="schedule-info">
-                        <div className="schedule-title">{item.title}</div>
-                        <div className="schedule-meta">
-                          <span>{energyIcon} {item.energy_level}</span>
-                          <span>•</span>
-                          <span style={{ color: todColor, fontWeight: 600 }}>{item.time_of_day}</span>
-                          {item.task_type === "fixed" && <><span>•</span><span style={{ color: "var(--accent2)" }}>Fixed</span></>}
+            {!panelCollapsed.schedule && (
+              scheduleLoading ? (
+                <div className="empty" style={{ padding: "24px 0" }}>Building your schedule…</div>
+              ) : !schedule ? (
+                <div className="empty" style={{ padding: "24px 0" }}>
+                  <div style={{ fontSize: "1.5rem", marginBottom: 8 }}>📅</div>
+                  Could not load schedule. Make sure the backend is running.
+                </div>
+              ) : schedule.scheduled.length === 0 && schedule.overflow.length === 0 ? (
+                <div className="empty" style={{ padding: "24px 0" }}>
+                  <div style={{ fontSize: "1.5rem", marginBottom: 8 }}>✅</div>
+                  No tasks to schedule today. Add some tasks to get started.
+                </div>
+              ) : (
+                <div className="schedule-list">
+                  {schedule.scheduled.map((item) => {
+                    const energyIcon = item.energy_level === "high" ? "🔥" : item.energy_level === "medium" ? "⚡" : "🌿";
+                    const todColor = item.time_of_day === "morning" ? "#ffd43b" : item.time_of_day === "afternoon" ? "#74c0fc" : "#b197fc";
+                    return (
+                      <div key={item.task_id} className="schedule-item">
+                        <div className="schedule-time-col">
+                          <span className="schedule-start">{item.start_time}</span>
+                          <span className="schedule-end">{item.end_time}</span>
+                        </div>
+                        <div className="schedule-bar" style={{ background: todColor }} />
+                        <div className="schedule-info">
+                          <div className="schedule-title">{item.title}</div>
+                          <div className="schedule-meta">
+                            <span>{energyIcon} {item.energy_level}</span>
+                            <span>•</span>
+                            <span style={{ color: todColor, fontWeight: 600 }}>{item.time_of_day}</span>
+                            {item.task_type === "fixed" && <><span>•</span><span style={{ color: "var(--accent2)" }}>Fixed</span></>}
+                          </div>
                         </div>
                       </div>
+                    );
+                  })}
+                  {schedule.overflow.length > 0 && (
+                    <div className="schedule-overflow">
+                      <div className="schedule-overflow-label">⚠ Didn't fit today</div>
+                      {schedule.overflow.map((item) => (
+                        <div key={item.task_id} className="schedule-overflow-item">
+                          <span>{item.title}</span>
+                          <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>{item.energy_level}</span>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
-                {schedule.overflow.length > 0 && (
-                  <div className="schedule-overflow">
-                    <div className="schedule-overflow-label">⚠ Didn't fit today</div>
-                    {schedule.overflow.map((item) => (
-                      <div key={item.task_id} className="schedule-overflow-item">
-                        <span>{item.title}</span>
-                        <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>{item.energy_level}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )
             )}
           </section>
 
-          <section className="panel calendar-panel">
-            <div className="cal-view-switcher">
-              {(["month","week","agenda"] as CalView[]).map(v => (
-                <button key={v} className={`cal-view-btn${calView === v ? " cal-view-btn-active" : ""}`} onClick={() => setCalView(v)}>
-                  {v.charAt(0).toUpperCase() + v.slice(1)}
-                </button>
-              ))}
+          <section className="panel calendar-panel" style={panelCollapsed.calendar ? {} : { minHeight: 520 }}>
+            <div className="panel-head" style={{ marginBottom: panelCollapsed.calendar ? 0 : 4 }}>
+              <div style={{ cursor: "pointer", userSelect: "none" }} onClick={() => setPanelCollapsed(p => ({ ...p, calendar: !p.calendar }))}>
+                <h1 className="panel-title">
+                  Calendar
+                  <button className="panel-collapse-btn" tabIndex={-1} aria-label={panelCollapsed.calendar ? "Expand" : "Collapse"}>{panelCollapsed.calendar ? "▸" : "▾"}</button>
+                </h1>
+              </div>
             </div>
-            {calView === "month" && <MonthView />}
-            {calView === "week" && <WeekView />}
-            {calView === "agenda" && <AgendaView />}
+            {!panelCollapsed.calendar && (
+              <>
+                <div className="cal-view-switcher">
+                  {(["month","week","agenda"] as CalView[]).map(v => (
+                    <button key={v} className={`cal-view-btn${calView === v ? " cal-view-btn-active" : ""}`} onClick={() => setCalView(v)}>
+                      {v.charAt(0).toUpperCase() + v.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {calView === "month" && <MonthView />}
+                {calView === "week" && <WeekView />}
+                {calView === "agenda" && <AgendaView />}
+              </>
+            )}
           </section>
         </div>
       </main>
@@ -1447,12 +1566,14 @@ export default function Dashboard() {
           <div className="modal modal-tall" ref={editModalRef}>
             <div className="modal-header">
               <h2 className="modal-title">Edit Task</h2>
-              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => { setShowEditModal(false); if (editReturnToDay) { setDayPopup(editReturnToDay); setEditReturnToDay(null); } }}>✕</button>
             </div>
             <form onSubmit={saveEditTask} style={{ overflowY: "auto", maxHeight: "calc(80vh - 80px)", paddingRight: 4 }}>
               <TaskFormFields f={editForm} setF={setEditForm} err={editErr} showOpt={showEditOptional} setShowOpt={setShowEditOptional} showRec={showEditRecurrence} setShowRec={setShowEditRecurrence} />
               <div className="modal-actions" style={{ marginTop: 20 }}>
-                <button type="button" className="ghost-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="button" className="ghost-btn" onClick={() => { setShowEditModal(false); if (editReturnToDay) { setDayPopup(editReturnToDay); setEditReturnToDay(null); } }}>
+                  {editReturnToDay ? "← Back" : "Cancel"}
+                </button>
                 <button type="submit" className="primary-btn" disabled={editing || !editForm.title.trim() || !editForm.task_type}>{editing ? "Saving…" : "Save Changes"}</button>
               </div>
             </form>

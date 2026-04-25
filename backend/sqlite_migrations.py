@@ -33,6 +33,7 @@ _TASKS_COLUMNS: list[tuple[str, str]] = [
     ("actual_time_of_day", "TEXT"),
     ("times_rescheduled", "INTEGER NOT NULL DEFAULT 0"),
     ("last_scheduled_date", "TEXT"),
+    ("category", "TEXT NOT NULL DEFAULT 'Work'"),
 ]
 
 

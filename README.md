@@ -46,13 +46,24 @@ All computation is centralized in the backend to ensure consistency across platf
 
 ```
 personal-analytics-dashboard/
-├── backend/        # FastAPI app, scheduler, ML logic
-├── web/            # React/Vite frontend + Tauri desktop wrapper
-├── desktop/        # Python/PySide6 desktop client
-├── launcher/       # Startup scripts (Python + Go)
-├── database/       # SQLite database file + schema
-├── docs/           # Design and project documentation
-└── requirements.txt
+├── backend/          # FastAPI app, scheduler, ML logic, tests
+├── web/              # React/Vite frontend + Tauri desktop wrapper
+├── desktop/          # Python/PySide6 desktop client
+├── launcher/         # Startup scripts (Python + Go)
+├── database/         # SQLite database file + schema
+├── docs/             # Design and project documentation
+│   ├── api-spec.md    # API endpoints and usage
+│   ├── architecture.md # System architecture overview
+│   ├── ml-design.md   # Machine learning components
+│   ├── user-guide.md  # User manual and tutorials
+│   └── final-report.pdf # Project final report
+├── scripts/          # Utility scripts (e.g., admin seeding)
+├── pytest.ini        # Pytest configuration
+├── requirements.txt  # Python dependencies
+├── SETUP.md          # Detailed setup instructions
+├── start-dashboard.bat  # Windows startup script
+├── start-dashboard.sh   # Unix startup script
+└── TODO.md           # Project milestones and tasks
 ```
 
 ---
@@ -102,116 +113,212 @@ cd personal-analytics-dashboard
 
 ---
 
-## Quick Start (recommended)
+## Quick Start (All Components Together)
 
-On a fresh machine with Python 3.10+ and Node.js installed, run:
+For the fastest setup, use the provided startup scripts:
 
-```bash
-./start-dashboard.sh
-```
-
-The script will:
-- Create/use a Python virtual environment
-- Install backend dependencies from `requirements.txt`
-- Build the React frontend if `web/react-version/dist/` is missing
-- Start the API and open the app (Tauri if available, otherwise browser)
-
-On Windows:
-
+### Windows
 ```bat
 start-dashboard.bat
 ```
 
+### macOS / Linux
+```bash
+./start-dashboard.sh
+```
+
+These scripts will:
+1. Set up Python virtual environment (if needed)
+2. Install/update backend dependencies
+3. Build the React frontend (if changes detected)
+4. Start the FastAPI backend server
+5. Launch the Tauri desktop app (or open web client in browser)
+
 ---
 
-## 3. Backend Setup (API Server)
+## Manual Startup (Component by Component)
 
-From the project root, create and activate a virtual environment:
+### 1. Backend API Server
+
+**Prerequisites**: Python 3.10+, virtual environment
 
 ```bash
-# Create venv
+# Navigate to project root
+cd personal-analytics-dashboard
+
+# Create/activate virtual environment
 python -m venv .venv
-
-# Activate (Windows)
+# Windows:
 .venv\Scripts\activate
-
-# Activate (macOS / Linux)
+# macOS/Linux:
 source .venv/bin/activate
-```
 
-Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Start the server
+uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Start the backend server from the project root:
+**Verification**:
+- API: http://127.0.0.1:8000
+- Interactive docs: http://127.0.0.1:8000/docs
+- Health check: http://127.0.0.1:8000/health
+
+### Optional: Seed Admin User and Sample Data
+
+For development/testing, you can seed the database with an admin user and sample tasks:
+
 ```bash
-python -m uvicorn backend.app:app --reload
+python scripts/seed_admin.py
 ```
 
-The API will be available at:  
-`http://127.0.0.1:8000`
+This creates:
+- Admin user: `admin@admin.com` / `Test1234`
+- Two weeks of sample tasks (past and future)
 
-Interactive API docs:  
-`http://127.0.0.1:8000/docs`
+Run this after starting the backend for the first time to populate the database with test data.
 
----
-
-## 4. Tauri Desktop App Setup
-
-Requires Node.js and Rust (see Prerequisites).
+**Prerequisites**: Node.js 16+, backend running
 
 ```bash
+# Navigate to web client
 cd web/react-version
+
+# Install dependencies (first time only)
 npm install
-npm run tauri:dev
-```
 
----
-
-## 5. Web Client Setup
-
-```bash
-cd web/react-version
-npm install
+# Start development server
 npm run dev
 ```
 
-The dev server runs at `http://localhost:5173`.
+**Access**: http://localhost:5173
 
----
+The web client will connect to the backend at http://127.0.0.1:8000
 
-## 6. Running the Full System
+### 3. Tauri Desktop App
 
-Use the startup script (recommended):
+**Prerequisites**: Rust, Node.js, backend running
 
 ```bash
-./start-dashboard.sh   # macOS / Linux
-start-dashboard.bat    # Windows
-```
-
-Or run manually:
-
-1. Start the backend API (from project root):
-```bash
-python -m uvicorn backend.app:app --reload
-```
-
-2. Launch the Tauri desktop app:
-```bash
+# Navigate to web client
 cd web/react-version
+
+# Install dependencies (first time only)
+npm install
+
+# Start Tauri development app
 npm run tauri:dev
 ```
 
-3. Or open the web client in a browser:
+This opens a native desktop window with the React app inside.
+
+### 4. Python Desktop Client
+
+**Prerequisites**: Python 3.10+, PySide6, backend running
+
 ```bash
-cd web/react-version
-npm run dev
+# Navigate to desktop client
+cd desktop
+
+# Install dependencies (if separate venv)
+pip install -r requirements.txt
+
+# Run the desktop app
+python main.py
 ```
 
 ---
 
-## 7. Common Issues
+## Running All Components Together (Manual)
+
+1. **Terminal 1 - Backend**:
+   ```bash
+   cd personal-analytics-dashboard
+   source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+   uvicorn backend.app:app --reload
+   ```
+
+2. **Terminal 2 - Web Client** (optional):
+   ```bash
+   cd web/react-version
+   npm run dev
+   ```
+
+3. **Terminal 3 - Desktop App**:
+   ```bash
+   cd web/react-version
+   npm run tauri:dev
+   ```
+   Or for Python desktop:
+   ```bash
+   cd desktop
+   python main.py
+   ```
+
+---
+
+## Production Deployment
+
+For production:
+
+1. **Backend**: Use a production ASGI server like Gunicorn
+2. **Web Client**: Build static files with `npm run build`
+3. **Database**: Switch from SQLite to MySQL/PostgreSQL
+4. **Security**: Set strong SECRET_KEY, configure CORS properly
+
+See SETUP.md for detailed production configuration.
+
+---
+
+## Testing
+
+The project includes comprehensive tests for both backend and frontend components.
+
+### Backend Tests (Python/Pytest)
+
+```bash
+# Ensure virtual environment is activated
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Run all backend tests with coverage
+pytest
+
+# Alternative commands:
+# pytest --no-cov          # Run without coverage
+# pytest -v                # Verbose output
+# pytest backend/tests/test_specific_file.py  # Run specific test
+```
+
+Tests are configured via `pytest.ini` and include coverage reporting for the `backend/` directory.
+
+### Web Frontend Tests (JavaScript/Vitest)
+
+```bash
+# Navigate to web client
+cd web/react-version
+
+# Run all web tests
+npm test
+
+# Alternative commands:
+# npm run test:watch      # Run in watch mode
+# npm run lint            # Run ESLint checks
+```
+
+### Running All Tests
+
+```bash
+# Backend tests
+pytest
+
+# Web tests
+cd web/react-version && npm test
+```
+
+---
+
+## 8. Common Issues
 
 **uvicorn not found:**
 ```bash

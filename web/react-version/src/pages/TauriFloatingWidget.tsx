@@ -6,10 +6,20 @@ import { API_BASE } from "../apiBase.ts";
 type Task = {
   id: number;
   title: string;
+  category: string;
   duration_minutes: number;
   deadline: string | null;
-  importance?: number;
-  completed?: boolean;
+  importance: number;
+  completed: boolean;
+  created_at: string;
+  task_type: string | null;
+  fixed_start: string | null;
+  fixed_end: string | null;
+  location: string | null;
+  energy_level: string | null;
+  preferred_time: string | null;
+  recurrence: string | null;
+  recurrence_days: string | null;
 };
 
 function importanceDot(n: number) {
@@ -24,6 +34,48 @@ function formatWidgetDate(d: Date) {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * Check if a task is scheduled for today, using the same logic as the backend.
+ * This matches what appears in the main dashboard's monthly/weekly views.
+ */
+function isTaskScheduledForToday(task: Task, today: Date): boolean {
+  // Completed tasks are never scheduled
+  if (task.completed) return false;
+
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dayOfWeek = String(today.getDay()); // 0=Mon, 6=Sun
+
+  // 1. Fixed tasks: include only if deadline matches today
+  if (task.task_type === "fixed") {
+    return task.deadline === todayStr;
+  }
+
+  // 2. Recurring daily: always include
+  if (task.recurrence === "daily") {
+    return true;
+  }
+
+  // 3. Recurring weekly: include if today is in recurrence_days
+  if (task.recurrence === "weekly" && task.recurrence_days) {
+    const recurrenceDays = task.recurrence_days.split(",");
+    return recurrenceDays.includes(dayOfWeek);
+  }
+
+  // 4. Non-recurring: include if deadline is today or no deadline
+  if (task.deadline === null || task.deadline === todayStr) {
+    return true;
+  }
+
+  // 5. Semi-flexible tasks with future deadline: include if not yet scheduled today
+  // Note: We don't have last_scheduled_date in the widget, so we'll include them
+  // This matches the backend logic for tasks that haven't been scheduled yet
+  if (task.task_type === "semi" && task.deadline && task.deadline >= todayStr) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -86,10 +138,8 @@ export default function TauriFloatingWidget() {
   }, [fetchWithToken]);
 
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const todayTasks = tasks.filter((t) => !t.completed && t.deadline === todayStr);
-  const noDateTasks = tasks.filter((t) => !t.completed && !t.deadline);
-  const showList = todayTasks.length > 0 || noDateTasks.length > 0;
+  const todayTasks = tasks.filter((t) => isTaskScheduledForToday(t, today));
+  const showList = todayTasks.length > 0;
 
   return (
     <div className="tauri-float-widget-wrap">
@@ -120,40 +170,19 @@ export default function TauriFloatingWidget() {
           )}
           {!loading && !error && showList && (
             <div className="tauri-float-widget-list-wrap">
-              {todayTasks.length > 0 && (
-                <>
-                  <div className="tauri-float-widget-section">Due today</div>
-                  <ul className="tauri-float-widget-ul">
-                    {todayTasks.map((t) => (
-                      <li
-                        key={t.id}
-                        className="tauri-float-widget-li"
-                        style={{ borderLeftColor: importanceDot(t.importance ?? 3) }}
-                      >
-                        <span className="tauri-float-widget-li-title">{t.title}</span>
-                        <span className="tauri-float-widget-li-meta">{t.duration_minutes} min</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {noDateTasks.length > 0 && (
-                <>
-                  <div className="tauri-float-widget-section">No deadline</div>
-                  <ul className="tauri-float-widget-ul">
-                    {noDateTasks.slice(0, 8).map((t) => (
-                      <li
-                        key={t.id}
-                        className="tauri-float-widget-li"
-                        style={{ borderLeftColor: importanceDot(t.importance ?? 3) }}
-                      >
-                        <span className="tauri-float-widget-li-title">{t.title}</span>
-                        <span className="tauri-float-widget-li-meta">{t.duration_minutes} min</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
+              <div className="tauri-float-widget-section">Today's Tasks</div>
+              <ul className="tauri-float-widget-ul">
+                {todayTasks.slice(0, 15).map((t) => (
+                  <li
+                    key={t.id}
+                    className="tauri-float-widget-li"
+                    style={{ borderLeftColor: importanceDot(t.importance ?? 3) }}
+                  >
+                    <span className="tauri-float-widget-li-title">{t.title}</span>
+                    <span className="tauri-float-widget-li-meta">{t.duration_minutes} min</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

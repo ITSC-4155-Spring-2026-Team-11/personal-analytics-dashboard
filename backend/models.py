@@ -127,6 +127,7 @@ class Task(Base):
 
     # ── Core fields (already existed) ─────────────────────────────────────────
     title            : Mapped[str]           = mapped_column(String,   nullable=False)
+    category         : Mapped[str]           = mapped_column(String(20), default="Work", nullable=False)  # "Work"|"Study"|"Exercise"|"Rest"
     duration_minutes : Mapped[int]           = mapped_column(Integer,  default=30)
     deadline         : Mapped[Optional[str]] = mapped_column(String,   nullable=True)  # YYYY-MM-DD
     importance       : Mapped[int]           = mapped_column(Integer,  default=3)       # 1-5

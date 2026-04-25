@@ -29,6 +29,9 @@ echo Installing Python dependencies... 1>&2
 "%PY%" -m pip install --upgrade pip
 "%PY%" -m pip install -r requirements.txt
 
+echo Seeding database with admin user and sample tasks... 1>&2
+"%PY%" scripts\seed_admin.py
+
 set "DIST_INDEX=%ROOT_DIR%\web\react-version\dist\index.html"
 if not exist "%DIST_INDEX%" (
   echo Building React frontend ^(npm run build^)... 1>&2

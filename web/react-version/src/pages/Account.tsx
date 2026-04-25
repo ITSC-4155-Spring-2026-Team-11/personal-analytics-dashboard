@@ -159,6 +159,21 @@ export default function Account() {
     }
   }, [session, fetchIntegrations]);
 
+  useEffect(() => {
+    if (!session) return;
+    const token = sessionStorage.getItem("access_token");
+    if (!token) return;
+    fetch(`${API_BASE}/preferences`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setWakeTime(data.wake_time ?? "07:00");
+          setSleepTime(data.sleep_time ?? "23:00");
+        }
+      })
+      .catch(() => {});
+  }, [session]);
+
   async function signOut() {
     const refreshToken = sessionStorage.getItem("refresh_token");
     if (refreshToken) {

@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-
 const SHOW_BACKOFF_MS = [0, 120, 280, 600, 1200];
 const HIDE_BACKOFF_MS = [0, 80, 200];
 
@@ -11,6 +9,7 @@ export async function showWidgetRobust(): Promise<void> {
       await new Promise((r) => setTimeout(r, delay));
     }
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("show_widget_window");
       return;
     } catch (e) {
@@ -28,6 +27,7 @@ export async function hideWidgetRobust(): Promise<void> {
       await new Promise((r) => setTimeout(r, delay));
     }
     try {
+      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("hide_widget_window");
       return;
     } catch (e) {
