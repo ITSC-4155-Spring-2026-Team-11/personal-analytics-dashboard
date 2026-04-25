@@ -227,6 +227,11 @@ header .user-info--compact {
 /* ── Task list ── */
 .list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .task-group-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 2px; margin-top: 4px; }
+.task-group-toggle { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; cursor: pointer; text-align: left; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 2px; margin-top: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; }
+.task-group-toggle:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.task-group-toggle .group-chevron { margin-left: auto; font-size: 0.65rem; opacity: 0.6; transition: transform 0.2s; }
+.panel-collapse-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.8rem; padding: 2px 4px; transition: color 0.15s; line-height: 1; vertical-align: middle; }
+.panel-collapse-btn:hover { color: var(--text); }
 .task {
   display: flex; justify-content: space-between; align-items: center;
   gap: 14px; padding: 13px 16px; border-radius: 12px;
