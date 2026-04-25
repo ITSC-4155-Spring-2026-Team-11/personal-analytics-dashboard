@@ -27,7 +27,6 @@ database/app.db
 
 # Web
 node_modules/
-dist/
 dist-ssr/
 *.local
 src-tauri/
