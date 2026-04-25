@@ -271,7 +271,54 @@ See SETUP.md for detailed production configuration.
 
 ---
 
-## 7. Common Issues
+## Testing
+
+The project includes comprehensive tests for both backend and frontend components.
+
+### Backend Tests (Python/Pytest)
+
+```bash
+# Ensure virtual environment is activated
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Run all backend tests with coverage
+pytest
+
+# Alternative commands:
+# pytest --no-cov          # Run without coverage
+# pytest -v                # Verbose output
+# pytest backend/tests/test_specific_file.py  # Run specific test
+```
+
+Tests are configured via `pytest.ini` and include coverage reporting for the `backend/` directory.
+
+### Web Frontend Tests (JavaScript/Vitest)
+
+```bash
+# Navigate to web client
+cd web/react-version
+
+# Run all web tests
+npm test
+
+# Alternative commands:
+# npm run test:watch      # Run in watch mode
+# npm run lint            # Run ESLint checks
+```
+
+### Running All Tests
+
+```bash
+# Backend tests
+pytest
+
+# Web tests
+cd web/react-version && npm test
+```
+
+---
+
+## 8. Common Issues
 
 **uvicorn not found:**
 ```bash
