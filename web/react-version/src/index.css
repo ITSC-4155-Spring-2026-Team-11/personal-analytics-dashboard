@@ -57,3 +57,10 @@ body {
 .task-toggle input:checked + .task-toggle-slider::before {
   transform: translateX(16px);
 }
+
+/* White calendar and clock icons for date/time inputs */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}

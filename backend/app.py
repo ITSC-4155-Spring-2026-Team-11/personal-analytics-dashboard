@@ -26,6 +26,7 @@ from backend.routes.schedules import router as schedules_router
 from backend.routes.feedback import router as feedback_router
 from backend.routes.auth import router as auth_router
 from backend.routes.preferences import router as preferences_router
+from backend.routes.analytics import router as analytics_router
 
 app = FastAPI(title="Personal Analytics Dashboard API")
 
@@ -62,6 +63,7 @@ app.include_router(tasks_router,       prefix="/tasks",       tags=["tasks"])
 app.include_router(schedules_router,   prefix="/schedules",   tags=["schedules"])
 app.include_router(feedback_router,    prefix="/feedback",    tags=["feedback"])
 app.include_router(preferences_router, prefix="/preferences", tags=["preferences"])
+app.include_router(analytics_router,   prefix="/analytics",   tags=["analytics"])
 
 # ── SPA (Vite build): same origin as API on :8000 — no separate Vite server needed ──
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -95,8 +97,8 @@ if _FRONTEND_DIST.is_dir():  # pragma: no cover
     @app.get("/{path:path}")
     def spa_fallback(path: str):
         # Don't swallow backend API routes.
-        if path in ("auth", "tasks", "schedules", "feedback", "preferences") or path.startswith(
-            ("auth/", "tasks/", "schedules/", "feedback/", "preferences/")
+        if path in ("auth", "tasks", "schedules", "feedback", "preferences", "analytics") or path.startswith(
+            ("auth/", "tasks/", "schedules/", "feedback/", "preferences/", "analytics/")
         ):
             raise HTTPException(status_code=404)
 
