@@ -25,6 +25,8 @@ type Task = {
   preferred_time: string | null;
   recurrence: string | null;
   recurrence_days: string | null;
+  source?: string | null;
+  external_provider?: string | null;
 };
 
 function importanceLabel(n: number) {
@@ -973,6 +975,7 @@ export default function Dashboard() {
   }
 
   function TaskCard({ t }: { t: Task }) {
+    const imported = t.source && t.source !== "manual";
     const displayDuration = (() => {
       if (t.task_type === "fixed" && t.fixed_start && t.fixed_end) {
         const computed = calcDuration(t.fixed_start, t.fixed_end);
@@ -992,6 +995,12 @@ export default function Dashboard() {
             <div className="task-title" style={{ textDecoration: t.completed ? "line-through" : "none", opacity: t.completed ? 0.5 : 1 }}>{t.title}</div>
             <div className="task-meta">
               <PriorityBadge n={t.importance} />
+              {imported && (
+                <>
+                  <span>•</span>
+                  <span style={{ fontWeight: 700, color: "var(--accent2)" }}>Imported</span>
+                </>
+              )}
               {t.category && (() => {
                 const cat = CATEGORIES.find(c => c.value === t.category);
                 return (
@@ -1007,7 +1016,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {!t.completed && <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openEditModal(t)}>Edit</button>}
+          {!t.completed && !imported && <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openEditModal(t)}>Edit</button>}
           <button className="danger-btn" onClick={() => handleDeleteClick(t)}>Delete</button>
         </div>
       </article>

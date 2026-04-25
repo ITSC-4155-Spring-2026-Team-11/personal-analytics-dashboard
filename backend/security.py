@@ -23,6 +23,7 @@ __all__ = [
     "refresh_token_expiry", "generate_verification_token",
     "generate_totp_secret", "verify_totp", "get_totp_uri",
     "create_2fa_pending_token", "decode_2fa_pending_token",
+    "create_oauth_state_token", "decode_oauth_state_token",
 ]
 
 
@@ -99,4 +100,31 @@ def decode_2fa_pending_token(token: str) -> dict[str, Any]:
     payload: dict[str, Any] = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     if payload.get("purpose") != "2fa_pending":
         raise ValueError("Invalid token purpose")
+    return payload
+
+
+# ── Integrations (OAuth state) ────────────────────────────────────────────────
+
+def create_oauth_state_token(user_id: int, provider: str, minutes_valid: int = 10) -> str:
+    """
+    Signed state token passed through OAuth redirects.
+    Keeps the callback stateless (no server-side session storage).
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes_valid)
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "provider": provider,
+        "purpose": "oauth_state",
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
+    return str(jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM))
+
+
+def decode_oauth_state_token(token: str) -> dict[str, Any]:
+    payload: dict[str, Any] = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if payload.get("purpose") != "oauth_state":
+        raise ValueError("Invalid token purpose")
+    if not payload.get("provider") or not payload.get("sub"):
+        raise ValueError("Invalid state token")
     return payload

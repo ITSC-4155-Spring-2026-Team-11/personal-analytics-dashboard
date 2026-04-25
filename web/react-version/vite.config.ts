@@ -19,6 +19,8 @@ export default defineConfig({
       "/schedules": "http://127.0.0.1:8000",
       "/feedback": "http://127.0.0.1:8000",
       "/preferences": "http://127.0.0.1:8000",
+      "/integrations": "http://127.0.0.1:8000",
+      "/calendar": "http://127.0.0.1:8000",
       "/analytics": "http://127.0.0.1:8000",
     },
   },
