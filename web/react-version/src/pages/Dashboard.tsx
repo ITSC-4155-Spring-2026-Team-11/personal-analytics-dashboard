@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TasksAtAGlanceWidget from "../components/TasksAtAGlanceWidget.tsx";
-import { emitTasksUpdatedIfTauri, syncTauriWidgetToken } from "../tauriWidgetBridge.ts";
+import { emitTasksUpdatedIfTauri, isTauriRuntime, syncTauriWidgetToken } from "../tauriWidgetBridge.ts";
 import { showWidgetRobust } from "../widgetInvoke.ts";
 import { API_BASE } from "../apiBase.ts";
 
@@ -1288,14 +1288,16 @@ export default function Dashboard() {
               Live reload
             </span>
           )}
-          <button
-            type="button"
-            className="widget-show-btn widget-show-btn--hero"
-            onClick={() => void openFloatingWidget()}
-            title="Opens the small floating task window (also: system tray → Show Widget)"
-          >
-            Show widget
-          </button>
+          {isTauriRuntime() && (
+            <button
+              type="button"
+              className="widget-show-btn widget-show-btn--hero"
+              onClick={() => void openFloatingWidget()}
+              title="Opens the small floating task window (also: system tray → Show Widget)"
+            >
+              Show widget
+            </button>
+          )}
           <button
             type="button"
             className="glance-btn"
@@ -1329,14 +1331,16 @@ export default function Dashboard() {
           <div className="side-title">Dashboard</div>
           <button className="side-pill" type="button">Taskboard</button>
           <button className="side-link" type="button" onClick={() => nav("/analytics")}>Analytics</button>
-          <button
-            type="button"
-            className="widget-show-btn widget-show-btn--sidebar"
-            onClick={() => void openFloatingWidget()}
-            title="Opens the floating task window"
-          >
-            Show widget
-          </button>
+          {isTauriRuntime() && (
+            <button
+              type="button"
+              className="widget-show-btn widget-show-btn--sidebar"
+              onClick={() => void openFloatingWidget()}
+              title="Opens the floating task window"
+            >
+              Show widget
+            </button>
+          )}
           <button className="side-link" type="button" onClick={() => nav("/account")}>Account settings</button>
           <button className="side-link side-link-danger" type="button" onClick={signOut}>Sign out</button>
         </aside>
@@ -1352,14 +1356,16 @@ export default function Dashboard() {
                 <p className="panel-sub">{dedupeForList(tasks).length} task{dedupeForList(tasks).length !== 1 ? "s" : ""} total</p>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <button
-                  type="button"
-                  className="widget-show-btn widget-show-btn--panel"
-                  onClick={() => void openFloatingWidget()}
-                  title="Floating task window"
-                >
-                  Show widget
-                </button>
+                {isTauriRuntime() && (
+                  <button
+                    type="button"
+                    className="widget-show-btn widget-show-btn--panel"
+                    onClick={() => void openFloatingWidget()}
+                    title="Floating task window"
+                  >
+                    Show widget
+                  </button>
+                )}
                 <button className="ghost-btn" type="button" onClick={fetchTasks}>↻ Refresh</button>
                 <button className="primary-btn" type="button" onClick={() => openAddModal()}>+ Add Task</button>
               </div>
