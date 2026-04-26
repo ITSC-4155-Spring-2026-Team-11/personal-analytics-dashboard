@@ -407,7 +407,7 @@ export default function Dashboard() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [showTaskGlance, setShowTaskGlance] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState({ tasks: false, schedule: false, calendar: false });
-  const [groupCollapsed, setGroupCollapsed] = useState({ overdue: false, upcoming: false, nodeadline: false, completed: true });
+  const [groupCollapsed, setGroupCollapsed] = useState({ overdue: false, upcoming: false, nodeadline: false, completed: true, available: false });
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState<TaskForm>(blankForm());
@@ -461,6 +461,11 @@ export default function Dashboard() {
   const [showEditRecurrence, setShowEditRecurrence] = useState(false);
   const editModalRef = useRef<HTMLDivElement>(null);
   const [editReturnToDay, setEditReturnToDay] = useState<string | null>(null);
+
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleTask, setRescheduleTask] = useState<Task | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const rescheduleModalRef = useRef<HTMLDivElement>(null);
 
   const [priorityFilter, setPriorityFilter] = useState<number>(0);
   const [dragTaskId, setDragTaskId] = useState<number | null>(null);
@@ -577,6 +582,12 @@ export default function Dashboard() {
     });
     setEditErr(null); setShowEditOptional(false); setShowEditRecurrence(false);
     setShowEditModal(true);
+  }
+
+  function openRescheduleModal(t: Task) {
+    setRescheduleTask(t);
+    setRescheduleDate(t.deadline || "");
+    setShowRescheduleModal(true);
   }
 
   function formToPayload(f: TaskForm) {
@@ -778,7 +789,7 @@ export default function Dashboard() {
     }
   }
 
-  async function rescheduleTask(id: number, newDeadline: string) {
+  async function handleRescheduleTask(id: number, newDeadline: string) {
     const t = sessionStorage.getItem("access_token");
     if (!t) return nav("/login", { replace: true });
     setTasks(prev => prev.map(task => task.id === id ? { ...task, deadline: newDeadline } : task));
@@ -923,10 +934,18 @@ export default function Dashboard() {
     return Array.from(seen.values());
   }
 
-  const overdueTasks = dedupeForList(filteredTasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed));
+  const overdueTasks = dedupeForList(filteredTasks.filter(t => t.deadline && t.deadline < todayStr && !t.completed && t.task_type !== "flexible"));
   const upcomingTasks = dedupeForList([...filteredTasks.filter(t => t.deadline && t.deadline >= todayStr && !t.completed)]).sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
   const noDeadlineTasks = dedupeForList(filteredTasks.filter(t => !t.deadline && !t.completed));
   const completedTasks = dedupeForList(filteredTasks.filter(t => t.completed));
+
+  // Available tasks: flexible tasks not scheduled for today
+  const scheduledIds = schedule ? new Set(schedule.scheduled.map(s => s.task_id)) : new Set();
+  const availableTasks = dedupeForList(filteredTasks.filter(t =>
+    !t.completed &&
+    t.task_type === "flexible" &&
+    !scheduledIds.has(t.id)
+  ));
 
   function tasksForDate(ds: string, scheduleData?: ScheduleData | null) {
     const byDeadline = filteredTasks.filter(t => t.deadline === ds);
@@ -1017,6 +1036,11 @@ export default function Dashboard() {
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {!t.completed && !imported && <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openEditModal(t)}>Edit</button>}
+          {!t.completed && t.task_type === "flexible" && (
+            <button className="ghost-btn" style={{ fontSize: "0.8rem" }} onClick={() => openRescheduleModal(t)}>
+              Move to...
+            </button>
+          )}
           <button className="danger-btn" onClick={() => handleDeleteClick(t)}>Delete</button>
         </div>
       </article>
@@ -1414,6 +1438,14 @@ export default function Dashboard() {
                             {!groupCollapsed.overdue && overdueTasks.map(t => <TaskCard key={t.id} t={t} />)}
                           </>
                         )}
+                        {availableTasks.length > 0 && (
+                          <>
+                            <button className="task-group-toggle" style={{ marginTop: overdueTasks.length > 0 ? 8 : 0, color: "#74c0fc" }} onClick={() => setGroupCollapsed(g => ({ ...g, available: !g.available }))}>
+                              📋 Available ({availableTasks.length})<span className="group-chevron">{groupCollapsed.available ? "▸" : "▾"}</span>
+                            </button>
+                            {!groupCollapsed.available && availableTasks.map(t => <TaskCard key={t.id} t={t} />)}
+                          </>
+                        )}
                         {upcomingTasks.length > 0 && (
                           <>
                             <button className="task-group-toggle" style={{ marginTop: overdueTasks.length > 0 ? 8 : 0 }} onClick={() => setGroupCollapsed(g => ({ ...g, upcoming: !g.upcoming }))}>
@@ -1572,6 +1604,52 @@ export default function Dashboard() {
                 <button type="submit" className="primary-btn" disabled={editing || !editForm.title.trim() || !editForm.task_type}>{editing ? "Saving…" : "Save Changes"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reschedule Modal ────────────────────────────────────────────────────── */}
+      {showRescheduleModal && rescheduleTask && (
+        <div className="modal-overlay">
+          <div className="modal" ref={rescheduleModalRef}>
+            <div className="modal-header">
+              <h2 className="modal-title">Move Task to Different Day</h2>
+              <button className="modal-close" onClick={() => setShowRescheduleModal(false)}>✕</button>
+            </div>
+            <div style={{ padding: "20px 0" }}>
+              <div className="modal-field">
+                <label>Task: <strong>{rescheduleTask.title}</strong></label>
+              </div>
+              <div className="modal-field">
+                <label>New deadline date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  min={todayStr}
+                />
+                <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: 4 }}>
+                  Flexible tasks can be moved without marking them as done. They'll remain available for scheduling.
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost-btn" onClick={() => setShowRescheduleModal(false)}>Cancel</button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  if (rescheduleTask && rescheduleDate) {
+                    handleRescheduleTask(rescheduleTask.id, rescheduleDate);
+                    setShowRescheduleModal(false);
+                  }
+                }}
+                disabled={!rescheduleDate}
+              >
+                Move Task
+              </button>
+            </div>
           </div>
         </div>
       )}

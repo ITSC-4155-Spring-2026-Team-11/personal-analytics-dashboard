@@ -213,4 +213,27 @@ def _build_for_date(user: User, date_str: str, db: Session) -> dict:
         today_str = date_str,
     )
 
+    # Filter overflow tasks: don't show flexible tasks or semi-flexible tasks
+    # that aren't due today as "didn't fit" - they remain available for scheduling
+    filtered_overflow = []
+    for overflow_task in result["overflow"]:
+        # Find the original task to check its type and deadline
+        task = db.query(Task).filter(
+            Task.id == overflow_task["task_id"],
+            Task.user_id == user.id
+        ).first()
+
+        if task:
+            # Only include in overflow if it's a semi-flexible task due today
+            if task.task_type == "semi" and task.deadline == date_str:
+                filtered_overflow.append(overflow_task)
+            # Flexible tasks and semi-flexible tasks with future deadlines
+            # remain available and don't appear in "didn't fit"
+        else:
+            # Fallback: include if we can't find the task
+            filtered_overflow.append(overflow_task)
+
+    # Update the result with filtered overflow
+    result["overflow"] = filtered_overflow
+
     return result
